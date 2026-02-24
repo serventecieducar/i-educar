@@ -13,7 +13,7 @@ class IeducarSetup extends Command
 {
     protected $signature = 'ieducar:setup';
 
-    protected $description = 'Configura automaticamente o i-Educar com anos letivos, turmas, disciplinas BNCC e calendário escolar';
+    protected $description = 'Configura automaticamente o i-Educar com anos letivos, turmas, disciplinas BNCC, calendário escolar, benefícios sociais e demais cadastros';
 
     public function handle(): int
     {

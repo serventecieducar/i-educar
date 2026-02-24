@@ -9,8 +9,10 @@ class SeederMaster extends Seeder
     public function run(): void
     {
         $this->call(EncerrarAno2024Seeder::class);
+        $this->call(AreaConhecimentoBnccSeeder::class);
         $this->call(ConfiguracaoEscolarSeeder::class);
         $this->call(CalendarioEscolarSeeder::class);
+        $this->call(BeneficioSocialSeeder::class);
         $this->call(ReligiaoSeeder::class);
     }
 }

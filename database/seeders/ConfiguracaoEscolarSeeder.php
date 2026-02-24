@@ -15,6 +15,7 @@ use App\Models\LegacyRegimeType;
 use App\Models\LegacySchool;
 use App\Models\LegacySchoolAcademicYear;
 use App\Models\LegacySchoolCourse;
+use App\Models\LegacyDisciplineSchoolClass;
 use App\Models\LegacySchoolClass;
 use App\Models\LegacySchoolGrade;
 use App\Models\LegacyPeriod;
@@ -91,34 +92,23 @@ class ConfiguracaoEscolarSeeder extends Seeder
         $turmaTipo = LegacySchoolClassType::query()->first();
         $turmaTurno = LegacyPeriod::query()->first();
 
+        $disciplinasPorCurso = AreaConhecimentoBnccSeeder::getDisciplinasPorCurso();
+
         $cursosConfig = [
             'Educação Infantil' => [
                 'qtd_etapas' => 4,
                 'grades' => ['Berçário I', 'Berçário II', 'Maternal', 'Pré-Escolar'],
-                'disciplinas' => [
-                    'Campos de Experiência: O eu, o outro e o nós',
-                    'Campos de Experiência: Corpo, gestos e movimentos',
-                    'Campos de Experiência: Traços, sons, cores e formas',
-                    'Campos de Experiência: Escuta, fala, pensamento e imaginação',
-                    'Campos de Experiência: Espaços, tempos, quantidades, relações e transformações',
-                ],
+                'disciplinas' => $disciplinasPorCurso['Educação Infantil'],
             ],
             'Ensino Fundamental' => [
                 'qtd_etapas' => 9,
                 'grades' => ['1º ano', '2º ano', '3º ano', '4º ano', '5º ano', '6º ano', '7º ano', '8º ano', '9º ano'],
-                'disciplinas' => [
-                    'Língua Portuguesa', 'Matemática', 'Ciências', 'História', 'Geografia',
-                    'Arte', 'Educação Física', 'Ensino Religioso', 'Inglês',
-                ],
+                'disciplinas' => $disciplinasPorCurso['Ensino Fundamental'],
             ],
             'Ensino Médio' => [
                 'qtd_etapas' => 3,
                 'grades' => ['1º ano', '2º ano', '3º ano'],
-                'disciplinas' => [
-                    'Língua Portuguesa', 'Matemática', 'Biologia', 'Física', 'Química',
-                    'História', 'Geografia', 'Filosofia', 'Sociologia',
-                    'Educação Física', 'Arte', 'Inglês',
-                ],
+                'disciplinas' => $disciplinasPorCurso['Ensino Médio'],
             ],
         ];
 
@@ -246,29 +236,37 @@ class ConfiguracaoEscolarSeeder extends Seeder
         );
     }
 
-    /** @param array<int> $anos */
-    private function vincularDisciplinasSerie(LegacyGrade $grade, array $nomesDisciplinas, int $instituicaoId, array $anos): void
+    /**
+     * @param array<int, array{nome: string, area: string}> $disciplinasConfig Cada item: ['nome' => string, 'area' => string]
+     * @param array<int> $anos
+     */
+    private function vincularDisciplinasSerie(LegacyGrade $grade, array $disciplinasConfig, int $instituicaoId, array $anos): void
     {
         $anosPg = $this->anosLetivosParaPg($anos);
+        $nomesBncc = [];
 
-        foreach ($nomesDisciplinas as $nome) {
+        foreach ($disciplinasConfig as $config) {
+            $nome = $config['nome'];
+            $nomeArea = $config['area'];
+            $nomesBncc[] = $nome;
+
+            $areaConhecimento = LegacyKnowledgeArea::firstOrCreate(
+                [
+                    'instituicao_id' => $instituicaoId,
+                    'nome' => $nomeArea,
+                ],
+                [
+                    'instituicao_id' => $instituicaoId,
+                    'nome' => $nomeArea,
+                ]
+            );
+
             $disciplina = LegacyDiscipline::query()
                 ->where('instituicao_id', $instituicaoId)
                 ->where('nome', $nome)
                 ->first();
 
             if (!$disciplina) {
-                $areaConhecimento = LegacyKnowledgeArea::query()
-                    ->where('instituicao_id', $instituicaoId)
-                    ->first();
-
-                if (!$areaConhecimento) {
-                    $areaConhecimento = LegacyKnowledgeArea::create([
-                        'instituicao_id' => $instituicaoId,
-                        'nome' => 'Área de Conhecimento Padrão',
-                    ]);
-                }
-
                 $disciplina = LegacyDiscipline::create([
                     'instituicao_id' => $instituicaoId,
                     'area_conhecimento_id' => $areaConhecimento->id,
@@ -277,6 +275,8 @@ class ConfiguracaoEscolarSeeder extends Seeder
                     'tipo_base' => 1,
                     'ordenamento' => 1,
                 ]);
+            } else {
+                $disciplina->update(['area_conhecimento_id' => $areaConhecimento->id]);
             }
 
             LegacyDisciplineAcademicYear::updateOrCreate(
@@ -289,6 +289,47 @@ class ConfiguracaoEscolarSeeder extends Seeder
                     'tipo_nota' => 1,
                     'anos_letivos' => $anosPg,
                 ]
+            );
+        }
+
+        $this->desativarComponentesNaoBncc($grade, $nomesBncc, $instituicaoId);
+    }
+
+    /**
+     * Desativa componentes curriculares existentes que não estão na lista BNCC,
+     * removendo-os do vínculo com a série para que não possam ser usados novamente.
+     *
+     * @param array<string> $nomesDisciplinasBncc Lista de nomes das disciplinas BNCC
+     */
+    private function desativarComponentesNaoBncc(LegacyGrade $grade, array $nomesDisciplinasBncc, int $instituicaoId): void
+    {
+        $nomesBncc = array_map('mb_strtolower', $nomesDisciplinasBncc);
+
+        $componentesVinculados = LegacyDisciplineAcademicYear::query()
+            ->where('ano_escolar_id', $grade->cod_serie)
+            ->pluck('componente_curricular_id');
+
+        if ($componentesVinculados->isEmpty()) {
+            return;
+        }
+
+        $disciplinasVinculadas = LegacyDiscipline::query()
+            ->where('instituicao_id', $instituicaoId)
+            ->whereIn('id', $componentesVinculados)
+            ->get(['id', 'nome']);
+
+        $componentesNaoBncc = $disciplinasVinculadas
+            ->filter(fn ($d) => !in_array(mb_strtolower($d->nome), $nomesBncc))
+            ->pluck('id');
+
+        if ($componentesNaoBncc->isNotEmpty()) {
+            LegacyDisciplineAcademicYear::query()
+                ->where('ano_escolar_id', $grade->cod_serie)
+                ->whereIn('componente_curricular_id', $componentesNaoBncc)
+                ->delete();
+
+            $this->command?->info(
+                "Componentes curriculares desativados da série '{$grade->nm_serie}': " . $componentesNaoBncc->count()
             );
         }
     }
@@ -312,7 +353,7 @@ class ConfiguracaoEscolarSeeder extends Seeder
             $nmTurma = $grade->nm_serie . ' - ' . $ano;
             $sglTurma = mb_substr($grade->nm_serie, 0, 3) . $ano;
 
-            LegacySchoolClass::firstOrCreate(
+            $turma = LegacySchoolClass::firstOrCreate(
                 [
                     'ref_ref_cod_escola' => $school->cod_escola,
                     'ref_ref_cod_serie' => $grade->cod_serie,
@@ -331,6 +372,39 @@ class ConfiguracaoEscolarSeeder extends Seeder
                     'visivel' => true,
                     'ativo' => 1,
                     'dias_semana' => [2, 3, 4, 5, 6],
+                ]
+            );
+
+            $this->vincularComponentesCurricularesTurma($school, $grade, $turma);
+        }
+    }
+
+    /**
+     * Vincula os componentes curriculares (disciplinas BNCC) da série à turma,
+     * permitindo lançamento de notas e faltas no iDiário.
+     */
+    private function vincularComponentesCurricularesTurma(
+        LegacySchool $school,
+        LegacyGrade $grade,
+        LegacySchoolClass $turma
+    ): void {
+        $componentesSerie = LegacyDisciplineAcademicYear::query()
+            ->where('ano_escolar_id', $grade->cod_serie)
+            ->get();
+
+        foreach ($componentesSerie as $ccAno) {
+            LegacyDisciplineSchoolClass::firstOrCreate(
+                [
+                    'componente_curricular_id' => $ccAno->componente_curricular_id,
+                    'turma_id' => $turma->cod_turma,
+                ],
+                [
+                    'ano_escolar_id' => $grade->cod_serie,
+                    'escola_id' => $school->cod_escola,
+                    'carga_horaria' => $ccAno->carga_horaria ?? 40,
+                    'docente_vinculado' => 0,
+                    'etapas_especificas' => 0,
+                    'etapas_utilizadas' => '',
                 ]
             );
         }
