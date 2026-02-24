@@ -105,6 +105,8 @@
         }
     },
     "scripts": {
+        "test": "vendor/bin/pest",
+        "test:setup": "vendor/bin/pest --testsuite=Setup",
         "format": "vendor/bin/pint",
         "openapi": "vendor/uderline/openapi-php-attributes/opag tests public/openapi.json",
         "set-permissions": "find bootstrap/cache -type d -exec chmod 777 {} + && find storage -type d -exec chmod 777 {} +",

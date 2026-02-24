@@ -6,6 +6,12 @@
          colors="true">
 
   <testsuites>
+    <testsuite name="Setup">
+      <file>./tests/Feature/IeducarSetupCommandTest.php</file>
+      <file>./tests/Unit/CalendarioEscolarSeederTest.php</file>
+      <file>./tests/Unit/ConfiguracaoEscolarSeederTest.php</file>
+      <file>./tests/Unit/ReligiaoSeederTest.php</file>
+    </testsuite>
     <testsuite name="Diario">
       <directory suffix="Test.php">./tests/Api</directory>
     </testsuite>
