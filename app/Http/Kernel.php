@@ -80,5 +80,6 @@ class Kernel extends HttpKernel
         'ieducar.suspended' => \App\Http\Middleware\Suspended::class,
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
         'ieducar.checkresetpassword' => \App\Http\Middleware\CheckResetPassword::class,
+        'ieducar.bi.menu' => \App\Http\Middleware\EnsureBiMenu::class,
     ];
 }

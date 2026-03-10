@@ -95,4 +95,20 @@ class Process
     public const RELOCATE = 695;
 
     public const UNENROLLMENT = 696;
+
+    public const MENU_BI = 9999200;
+
+    public const BI_MATRICULAS = 9999201;
+
+    public const BI_TURMAS = 9999202;
+
+    public const BI_LANCAMENTOS = 9999203;
+
+    public const BI_INDICADORES = 9999204;
+
+    public const BI_INCLUSAO_DIVERSIDADE = 9999205;
+
+    public const BI_BUSCA_ATIVA = 9999206;
+
+    public const BI_EDUCACENSO = 9999207;
 }

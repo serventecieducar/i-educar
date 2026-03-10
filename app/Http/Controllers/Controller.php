@@ -57,7 +57,7 @@ class Controller extends BaseController
     public function menu($process)
     {
         $user = Auth::user();
-        $menu = $this->getMenuCacheServiceInstance()->getMenuByUser($user);
+        $menu = $user ? $this->getMenuCacheServiceInstance()->getMenuByUser($user) : collect();
 
         $topmenu = Menu::query()
             ->where('process', $process)

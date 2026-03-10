@@ -17,6 +17,7 @@ use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Telescope\TelescopeServiceProvider;
 
@@ -92,6 +93,51 @@ class AppServiceProvider extends ServiceProvider
 
         QueryBuilder::macro('whereUnaccent', function ($column, $value) {
             $this->whereRaw('unaccent(' . $column . ') ilike unaccent(\'%\' || ? || \'%\')', [$value]);
+        });
+
+        View::composer('components.bi-print-header', function ($view) {
+            $institution = LegacyInstitution::query()
+                ->where('ativo', 1)
+                ->whereExists(function ($q) {
+                    $q->selectRaw(1)
+                        ->from('pmieducar.configuracoes_gerais as cg')
+                        ->whereColumn('cg.ref_cod_instituicao', 'pmieducar.instituicao.cod_instituicao');
+                })
+                ->first();
+
+            $nmInstituicao = config('legacy.config.ieducar_entity_name')
+                ?? $institution?->nm_instituicao
+                ?? config('legacy.app.entity.name')
+                ?? 'i-Educar';
+            $nmResponsavel = $institution?->nm_responsavel ?? $institution?->orgao_regional ?? '';
+            $logradouro = $institution?->logradouro ?? '';
+            $numero = $institution?->numero ?? '';
+            $bairro = $institution?->bairro ?? '';
+            $cidade = $institution?->cidade ?? '';
+            $uf = $institution?->ref_sigla_uf ?? '';
+            $cep = $institution?->cep
+                ? \App\Services\Reports\Util::formatPostcode((string) $institution->cep)
+                : '';
+            $foneDdd = $institution?->ddd_telefone ?? '';
+            $fone = $institution?->telefone ? (string) $institution->telefone : '';
+
+            $enderecoParts = array_filter([
+                $logradouro ? $logradouro . ',' : '',
+                $numero ? 'Nº ' . $numero : 'S/N',
+                $bairro ? ' - ' . $bairro : '',
+                $cidade ? ' - ' . $cidade : '',
+                $uf ? ' - ' . $uf : '',
+                $cep ? ' - CEP: ' . $cep : '',
+            ]);
+            $endereco = trim(implode(' ', $enderecoParts), ' -,');
+            $telefone = $foneDdd ? '(' . $foneDdd . ') ' . $fone : $fone;
+
+            $view->with([
+                'headerNmInstituicao' => mb_strtoupper($nmInstituicao, 'UTF-8'),
+                'headerNmResponsavel' => mb_strtoupper($nmResponsavel, 'UTF-8'),
+                'headerEndereco' => $endereco,
+                'headerTelefone' => $telefone,
+            ]);
         });
     }
 
