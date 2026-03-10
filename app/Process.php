@@ -98,6 +98,8 @@ class Process
 
     public const MENU_BI = 9999200;
 
+    public const BI_DASHBOARD = 9999199;
+
     public const BI_MATRICULAS = 9999201;
 
     public const BI_TURMAS = 9999202;
