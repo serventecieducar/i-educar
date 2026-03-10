@@ -72,6 +72,7 @@ pacote, siga as instruções de instalação encontradas no repositório do proj
 - [Módulo de Biblioteca](https://github.com/portabilis/i-educar-library-package/)
 - [Módulo de Transporte](https://github.com/portabilis/i-educar-transport-package/)
 - [Módulo do Educacenso](https://github.com/portabilis/i-educar-educacenso-package/)
+- [Módulo de BI (Business Intelligence)](https://github.com/serventecieducar/i-educar-powerbi-package) – Dashboards, indicadores e relatórios analíticos
 
 ## Upgrade
 

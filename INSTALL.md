@@ -6,6 +6,7 @@ instalação siga os passos do [guia de atualização](UPGRADE.md).
 - [Dependências](#dependências)
 - [Instalação utilizando Docker](#instalação-utilizando-docker)
 - [Instalação em servidor web](#instalação-em-servidor-web)
+- [Pacotes opcionais (plug-and-play)](#pacotes-opcionais-plug-and-play)
 - [Primeiro acesso](#primeiro-acesso)
 
 ## Dependências
@@ -196,6 +197,33 @@ comando abaixo:
 ```bash 
 php artisan db:seed --class=DemoSeeder
 ```
+
+## Pacotes opcionais (plug-and-play)
+
+O i-Educar utiliza [plug-and-play](https://github.com/edersoares/composer-plug-and-play) para módulos adicionais. Os pacotes devem ser clonados em `packages/portabilis/` ou `packages/serventec/` antes de executar `composer plug-and-play`.
+
+### Módulo de BI (Business Intelligence)
+
+Para adicionar dashboards e indicadores analíticos:
+
+```bash
+# Na raiz do i-Educar
+git clone git@github.com:serventecieducar/i-educar-powerbi-package.git packages/serventec/i-educar-bis-package
+
+# Com Docker
+docker compose exec php composer plug-and-play:add serventec/i-educar-bis-package @dev
+docker compose exec php composer plug-and-play
+docker compose exec php php artisan migrate
+docker compose exec php php artisan vendor:publish --tag=bis-assets
+
+# Ou sem Docker
+composer plug-and-play:add serventec/i-educar-bis-package @dev
+composer plug-and-play
+php artisan migrate
+php artisan vendor:publish --tag=bis-assets
+```
+
+O menu **BI** ficará disponível em **Escola > BI**. Consulte o [guia completo do pacote BI](docs/BI_PACOTE_INSTALACAO.md) para mais detalhes.
 
 ## Primeiro acesso
 
