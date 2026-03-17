@@ -15,5 +15,7 @@ class SeederMaster extends Seeder
         $this->call(CalendarioEscolarSeeder::class);
         $this->call(BeneficioSocialSeeder::class);
         $this->call(ReligiaoSeeder::class);
+        $this->call(TransferenciaTipoSeeder::class);
     }
 }
+
