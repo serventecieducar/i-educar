@@ -9,10 +9,25 @@ use Database\Factories\LegacySchoolFactory;
 use Database\Factories\LegacyUserFactory;
 use Illuminate\Database\Seeder;
 
+/**
+ * Carga **somente para desenvolvimento / treinamento**: escolas genéricas, turmas e alunos fictícios (Faker).
+ *
+ * Não use em produção nem após `php artisan ieducar:setup` com dados reais de município — conflita com cadastro oficial
+ * (INEP, instituição, escolas) e mistura dados simulados com a rede real.
+ */
 class DemoSeeder extends Seeder
 {
     public function run(): void
     {
+        if (app()->environment('production')) {
+            $this->command?->error(
+                'DemoSeeder não deve ser executado em produção (dados fictícios). '.
+                'Use `php artisan ieducar:setup` com o perfil do município ou cadastros manuais.'
+            );
+
+            return;
+        }
+
         LegacyUserFactory::new()->current();
 
         $morning = LegacyPeriodFactory::new()->morning();

@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\IeducarSetup\IeducarSetupProfiles;
 use App\Models\LegacyCourse;
 use App\Models\LegacyGrade;
 use App\Models\LegacySchool;
@@ -11,31 +12,63 @@ use Illuminate\Support\Facades\Log;
 
 class IeducarSetup extends Command
 {
-    protected $signature = 'ieducar:setup';
+    protected $signature = 'ieducar:setup
+                            {cidade-uf=default-br : Slug cidade-UF (ex.: default-br, itamari-ba, belem-pa)}';
 
-    protected $description = 'Configura automaticamente o i-Educar com anos letivos, turmas, disciplinas BNCC, calendário escolar, benefícios sociais e demais cadastros';
+    protected $description = 'Configura o i-Educar por perfil cidade-UF: padrão nacional (default-br) + rotinas municipais opcionais';
 
     public function handle(): int
     {
+        $cidadeUf = strtolower(trim((string) $this->argument('cidade-uf')));
+        $profiles = IeducarSetupProfiles::all();
+
+        if (!isset($profiles[$cidadeUf])) {
+            $this->error("❌ Perfil desconhecido: {$cidadeUf}");
+            $this->line('Perfis disponíveis: ' . implode(', ', IeducarSetupProfiles::slugs()));
+
+            return 1;
+        }
+
+        $profile = $profiles[$cidadeUf];
+        IeducarSetupProfiles::setActiveSlug($cidadeUf);
+
         $this->info('🚀 Iniciando configuração automática do i-Educar...');
-        Log::channel('daily')->info('Iniciando execução do comando ieducar:setup');
+        $this->line("📍 Perfil: {$profile['label']} ({$cidadeUf})");
+        if (!empty($profile['description'])) {
+            $this->line('   ' . $profile['description']);
+        }
+        Log::channel('daily')->info('Iniciando execução do comando ieducar:setup', [
+            'cidade_uf' => $cidadeUf,
+            'label' => $profile['label'],
+        ]);
 
         $startTime = microtime(true);
 
-        $bar = $this->output->createProgressBar(2);
+        $extra = $profile['extra_seeders'] ?? [];
+        $steps = 1 + count($extra);
+        $bar = $this->output->createProgressBar($steps);
         $bar->start();
 
         try {
             $this->call('db:seed', ['--class' => SeederMaster::class]);
             $bar->advance();
-            Log::channel('daily')->info('SeederMaster executado com sucesso');
+            Log::channel('daily')->info('SeederMaster executado com sucesso', ['cidade_uf' => $cidadeUf]);
+
+            foreach ($extra as $seederClass) {
+                $this->call('db:seed', ['--class' => $seederClass]);
+                $bar->advance();
+                Log::channel('daily')->info('Seeder municipal executado', [
+                    'cidade_uf' => $cidadeUf,
+                    'seeder' => $seederClass,
+                ]);
+            }
         } catch (\Exception $e) {
             $this->error('❌ Erro na configuração: ' . $e->getMessage());
-            Log::channel('daily')->error('Erro no setup', ['exception' => $e]);
+            Log::channel('daily')->error('Erro no setup', ['exception' => $e, 'cidade_uf' => $cidadeUf]);
+
             return 1;
         }
 
-        $bar->advance();
         $bar->finish();
         $this->newLine();
 

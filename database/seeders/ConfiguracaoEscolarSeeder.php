@@ -5,23 +5,25 @@ namespace Database\Seeders;
 use App\Models\LegacyCourse;
 use App\Models\LegacyDiscipline;
 use App\Models\LegacyDisciplineAcademicYear;
+use App\Models\LegacyDisciplineSchoolClass;
 use App\Models\LegacyEducationLevel;
 use App\Models\LegacyEducationType;
 use App\Models\LegacyEvaluationRule;
 use App\Models\LegacyEvaluationRuleGradeYear;
 use App\Models\LegacyGrade;
 use App\Models\LegacyKnowledgeArea;
+use App\Models\LegacyPeriod;
 use App\Models\LegacyRegimeType;
 use App\Models\LegacySchool;
 use App\Models\LegacySchoolAcademicYear;
-use App\Models\LegacySchoolCourse;
-use App\Models\LegacyDisciplineSchoolClass;
 use App\Models\LegacySchoolClass;
-use App\Models\LegacySchoolGrade;
-use App\Models\LegacyPeriod;
 use App\Models\LegacySchoolClassType;
+use App\Models\LegacySchoolCourse;
+use App\Models\LegacySchoolGrade;
+use App\Models\LegacySequenceGrade;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 
 class ConfiguracaoEscolarSeeder extends Seeder
 {
@@ -31,6 +33,7 @@ class ConfiguracaoEscolarSeeder extends Seeder
     private function obterAnosLetivos(): array
     {
         $anoAtual = Carbon::now()->year;
+
         return [$anoAtual - 1, $anoAtual];
     }
 
@@ -48,6 +51,7 @@ class ConfiguracaoEscolarSeeder extends Seeder
 
         if ($schools->isEmpty()) {
             $this->command?->warn('Nenhuma escola encontrada. Execute o setup em um ambiente com escolas cadastradas.');
+
             return;
         }
 
@@ -57,6 +61,93 @@ class ConfiguracaoEscolarSeeder extends Seeder
             $this->criarAnosLetivos($school, $anos);
             $this->criarCursosETurmas($school, $instituicaoId, $anos);
         }
+
+        $instituicoes = $schools->pluck('ref_cod_instituicao')->unique()->filter()->values();
+        foreach ($instituicoes as $instituicaoId) {
+            $this->garantirSequenciasEnturmacaoBncc((int) $instituicaoId);
+        }
+        $this->habilitarBloqueioMatriculaSerieNaoSeguinte($instituicoes->all());
+    }
+
+    /**
+     * Cursos BNCC com etapas (séries) em ordem — usado em cursos/turmas e na sequência de enturmação.
+     *
+     * @return array<string, array{qtd_etapas: int, grades: list<string>}>
+     */
+    private function definicaoCursosBnccEtapas(): array
+    {
+        return [
+            'Educação Infantil' => [
+                'qtd_etapas' => 4,
+                'grades' => ['Berçário I', 'Berçário II', 'Maternal', 'Pré-Escolar'],
+            ],
+            'Ensino Fundamental' => [
+                'qtd_etapas' => 9,
+                'grades' => ['1º ano', '2º ano', '3º ano', '4º ano', '5º ano', '6º ano', '7º ano', '8º ano', '9º ano'],
+            ],
+            'Ensino Médio' => [
+                'qtd_etapas' => 3,
+                'grades' => ['1º ano', '2º ano', '3º ano'],
+            ],
+        ];
+    }
+
+    /**
+     * Liga cada série à próxima dentro do mesmo curso (Berçário I → … → Pré-Escolar, 1º ano → … → 9º ano, etc.),
+     * para o i-Educar validar matrículas quando a instituição bloqueia série não sequente.
+     */
+    private function garantirSequenciasEnturmacaoBncc(int $instituicaoId): void
+    {
+        foreach ($this->definicaoCursosBnccEtapas() as $nomeCurso => $meta) {
+            $curso = LegacyCourse::query()
+                ->where('ref_cod_instituicao', $instituicaoId)
+                ->where('nm_curso', $nomeCurso)
+                ->first();
+
+            if ($curso === null) {
+                continue;
+            }
+
+            $serieIds = [];
+            foreach ($meta['grades'] as $nmSerie) {
+                $grade = LegacyGrade::query()
+                    ->where('ref_cod_curso', $curso->cod_curso)
+                    ->where('nm_serie', $nmSerie)
+                    ->first();
+                if ($grade !== null) {
+                    $serieIds[] = $grade->cod_serie;
+                }
+            }
+
+            for ($i = 0, $n = count($serieIds); $i < $n - 1; $i++) {
+                LegacySequenceGrade::query()->updateOrCreate(
+                    [
+                        'ref_serie_origem' => $serieIds[$i],
+                        'ref_serie_destino' => $serieIds[$i + 1],
+                    ],
+                    [
+                        'ref_usuario_cad' => self::USUARIO_CAD,
+                        'ativo' => 1,
+                        'data_cadastro' => now(),
+                    ]
+                );
+            }
+        }
+    }
+
+    /**
+     * @param  array<int|string>  $codigosInstituicao
+     */
+    private function habilitarBloqueioMatriculaSerieNaoSeguinte(array $codigosInstituicao): void
+    {
+        $ids = array_values(array_filter(array_map('intval', $codigosInstituicao)));
+        if ($ids === []) {
+            return;
+        }
+
+        DB::table('pmieducar.instituicao')
+            ->whereIn('cod_instituicao', $ids)
+            ->update(['bloqueia_matricula_serie_nao_seguinte' => true]);
     }
 
     /** @param array<int> $anos */
@@ -86,6 +177,7 @@ class ConfiguracaoEscolarSeeder extends Seeder
 
         if (!$regraAvaliacao) {
             $this->command?->warn("Instituição {$instituicaoId} sem regra de avaliação. Configure em Cadastros > Regras de avaliação.");
+
             return;
         }
 
@@ -94,25 +186,10 @@ class ConfiguracaoEscolarSeeder extends Seeder
 
         $disciplinasPorCurso = AreaConhecimentoBnccSeeder::getDisciplinasPorCurso();
 
-        $cursosConfig = [
-            'Educação Infantil' => [
-                'qtd_etapas' => 4,
-                'grades' => ['Berçário I', 'Berçário II', 'Maternal', 'Pré-Escolar'],
-                'disciplinas' => $disciplinasPorCurso['Educação Infantil'],
-            ],
-            'Ensino Fundamental' => [
-                'qtd_etapas' => 9,
-                'grades' => ['1º ano', '2º ano', '3º ano', '4º ano', '5º ano', '6º ano', '7º ano', '8º ano', '9º ano'],
-                'disciplinas' => $disciplinasPorCurso['Ensino Fundamental'],
-            ],
-            'Ensino Médio' => [
-                'qtd_etapas' => 3,
-                'grades' => ['1º ano', '2º ano', '3º ano'],
-                'disciplinas' => $disciplinasPorCurso['Ensino Médio'],
-            ],
-        ];
-
-        foreach ($cursosConfig as $nomeCurso => $config) {
+        foreach ($this->definicaoCursosBnccEtapas() as $nomeCurso => $meta) {
+            $config = array_merge($meta, [
+                'disciplinas' => $disciplinasPorCurso[$nomeCurso],
+            ]);
             $curso = LegacyCourse::query()
                 ->where('ref_cod_instituicao', $instituicaoId)
                 ->where('nm_curso', $nomeCurso)
@@ -133,6 +210,7 @@ class ConfiguracaoEscolarSeeder extends Seeder
 
                 if (!$nivel || !$tipo) {
                     $this->command?->warn("Instituição {$instituicaoId} sem nível de ensino ou tipo de ensino. Configure em Cadastros.");
+
                     continue;
                 }
 
