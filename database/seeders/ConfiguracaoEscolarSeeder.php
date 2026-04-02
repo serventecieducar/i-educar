@@ -168,6 +168,97 @@ class ConfiguracaoEscolarSeeder extends Seeder
         }
     }
 
+    /**
+     * Instalações só com migrations costumam não ter nível/tipo de ensino nem regime na instituição.
+     * Sem isso, não é possível criar cursos no setup.
+     */
+    private function garantirNivelTipoRegimeEnsino(int $instituicaoId): void
+    {
+        if (!LegacyEducationLevel::query()
+            ->where('ref_cod_instituicao', $instituicaoId)
+            ->where('ativo', 1)
+            ->exists()) {
+            LegacyEducationLevel::query()->create([
+                'ref_cod_instituicao' => $instituicaoId,
+                'ref_usuario_cad' => self::USUARIO_CAD,
+                'nm_nivel' => 'Educação Básica',
+                'descricao' => 'Nível gerado automaticamente pelo ConfiguracaoEscolarSeeder.',
+                'ativo' => 1,
+                'data_cadastro' => now(),
+            ]);
+            $this->command?->info("Instituição {$instituicaoId}: nível de ensino \"Educação Básica\" criado.");
+        }
+
+        if (!LegacyEducationType::query()
+            ->where('ref_cod_instituicao', $instituicaoId)
+            ->where('ativo', 1)
+            ->exists()) {
+            LegacyEducationType::query()->create([
+                'ref_cod_instituicao' => $instituicaoId,
+                'ref_usuario_cad' => self::USUARIO_CAD,
+                'nm_tipo' => 'Escolar',
+                'ativo' => 1,
+                'atividade_complementar' => false,
+                'data_cadastro' => now(),
+            ]);
+            $this->command?->info("Instituição {$instituicaoId}: tipo de ensino \"Escolar\" criado.");
+        }
+
+        if (!LegacyRegimeType::query()
+            ->where('ref_cod_instituicao', $instituicaoId)
+            ->where('ativo', 1)
+            ->exists()) {
+            LegacyRegimeType::query()->create([
+                'ref_cod_instituicao' => $instituicaoId,
+                'ref_usuario_cad' => self::USUARIO_CAD,
+                'nm_tipo' => 'Seriado',
+                'ativo' => 1,
+                'data_cadastro' => now(),
+            ]);
+            $this->command?->info("Instituição {$instituicaoId}: tipo de regime \"Seriado\" criado.");
+        }
+    }
+
+    /**
+     * Sem turnos ou tipo de turma o seeder não chama criarTurmas(); a intranet monta o filtro "Ano"
+     * só com DISTINCT em pmieducar.turma (ativo=1), resultando em "Indisponível" se não houver turmas.
+     */
+    private function garantirTipoTurmaETurno(int $instituicaoId): void
+    {
+        if (!LegacyPeriod::query()->exists()) {
+            DB::table('pmieducar.turma_turno')->insert([
+                ['id' => 1, 'nome' => 'Matutino', 'ativo' => 1],
+                ['id' => 2, 'nome' => 'Vespertino', 'ativo' => 1],
+                ['id' => 3, 'nome' => 'Noturno', 'ativo' => 1],
+                ['id' => 4, 'nome' => 'Integral', 'ativo' => 1],
+            ]);
+            DB::statement(
+                "SELECT setval('pmieducar.turma_turno_id_seq', (SELECT COALESCE(MAX(id), 1) FROM pmieducar.turma_turno), true)"
+            );
+            $this->command?->info('Turnos padrão (Matutino, Vespertino, Noturno, Integral) criados em pmieducar.turma_turno.');
+        }
+
+        $temTipo = LegacySchoolClassType::query()
+            ->where('ativo', 1)
+            ->where(function ($q) use ($instituicaoId) {
+                $q->where('ref_cod_instituicao', $instituicaoId)
+                    ->orWhereNull('ref_cod_instituicao');
+            })
+            ->exists();
+
+        if (!$temTipo) {
+            DB::table('pmieducar.turma_tipo')->insert([
+                'ref_usuario_cad' => self::USUARIO_CAD,
+                'nm_tipo' => 'Regular',
+                'sgl_tipo' => 'REG',
+                'data_cadastro' => now(),
+                'ativo' => 1,
+                'ref_cod_instituicao' => $instituicaoId,
+            ]);
+            $this->command?->info("Instituição {$instituicaoId}: tipo de turma \"Regular\" criado.");
+        }
+    }
+
     /** @param array<int> $anos */
     private function criarCursosETurmas(LegacySchool $school, int $instituicaoId, array $anos): void
     {
@@ -181,8 +272,27 @@ class ConfiguracaoEscolarSeeder extends Seeder
             return;
         }
 
-        $turmaTipo = LegacySchoolClassType::query()->first();
-        $turmaTurno = LegacyPeriod::query()->first();
+        $this->garantirNivelTipoRegimeEnsino($instituicaoId);
+        $this->garantirTipoTurmaETurno($instituicaoId);
+
+        $turmaTipo = LegacySchoolClassType::query()
+            ->where('ativo', 1)
+            ->where(function ($q) use ($instituicaoId) {
+                $q->where('ref_cod_instituicao', $instituicaoId)
+                    ->orWhereNull('ref_cod_instituicao');
+            })
+            ->orderByRaw('CASE WHEN ref_cod_instituicao = ? THEN 0 WHEN ref_cod_instituicao IS NULL THEN 1 ELSE 2 END', [$instituicaoId])
+            ->first();
+
+        $turmaTurno = LegacyPeriod::query()->where('ativo', 1)->orderBy('id')->first();
+
+        if (!$turmaTipo || !$turmaTurno) {
+            $this->command?->warn(
+                "Instituição {$instituicaoId}: tipo ou turno de turma indisponível após garantia automática; turmas não serão geradas."
+            );
+
+            return;
+        }
 
         $disciplinasPorCurso = AreaConhecimentoBnccSeeder::getDisciplinasPorCurso();
 
