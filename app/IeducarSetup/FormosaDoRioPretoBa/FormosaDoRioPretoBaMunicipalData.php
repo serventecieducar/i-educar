@@ -5,6 +5,7 @@ namespace App\IeducarSetup\FormosaDoRioPretoBa;
 final class FormosaDoRioPretoBaMunicipalData
 {
     public const CIDADE = 'Formosa do Rio Preto';
+
     public const UF = 'BA';
 
     /** Nome da mantenedora (Prefeitura) em cadastros, relatórios e entidade i-Educar. */
@@ -25,6 +26,18 @@ final class FormosaDoRioPretoBaMunicipalData
     /** CEP sede (faixa municipal ~47990-000 a 47999-999). Ajuste ao logradouro real se necessário. */
     public const CEP_PADRAO = '47990000';
 
+    /** Endereço oficial da Prefeitura (fonte: páginas públicas de contato/transparência). */
+    public const ENDERECO_LOGRADOURO = 'Praça da Matriz';
+
+    public const ENDERECO_NUMERO = 22;
+
+    public const ENDERECO_BAIRRO = 'Centro';
+
+    public const TELEFONE_DDD = 77;
+
+    /** Telefone principal (sem DDD, apenas números). */
+    public const TELEFONE_NUMERO = 36162121;
+
     /** Regime avaliativo do município (referência para relatórios / rodapé interno). */
     public const FORMA_AVALIATIVA = 'Quantitativa (nota numérica)';
 
@@ -40,4 +53,3 @@ final class FormosaDoRioPretoBaMunicipalData
     /** Média mínima para aprovação na recuperação final. */
     public const MEDIA_RECUPERACAO_FINAL = 5.0;
 }
-
