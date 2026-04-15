@@ -25,10 +25,46 @@ use App\Models\LegacySequenceGrade;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Symfony\Component\Console\Output\OutputInterface;
 
 class ConfiguracaoEscolarSeeder extends Seeder
 {
     private const USUARIO_CAD = 1;
+
+    /** Quando true, loga cada escola/instituição e micro-etapas (env ou `-v` no artisan). */
+    private function traceEnabled(): bool
+    {
+        if (filter_var(env('CONFIGURACAO_ESCOLAR_SEEDER_TRACE', false), FILTER_VALIDATE_BOOLEAN)) {
+            return true;
+        }
+
+        $cmd = $this->command;
+
+        return $cmd !== null && $cmd->getOutput()->getVerbosity() >= OutputInterface::VERBOSITY_VERBOSE;
+    }
+
+    /**
+     * Sempre Log::info (útil em produção com `tail -f storage/logs/laravel.log`);
+     * em TTY também imprime na saída do artisan.
+     */
+    private function step(string $message): void
+    {
+        $line = '[ConfiguracaoEscolarSeeder] '.$message;
+        Log::info($line);
+        $this->command?->info($line);
+    }
+
+    /** Só quando {@see traceEnabled()} — não poluir log em seeds longos sem necessidade. */
+    private function trace(string $message): void
+    {
+        if (!$this->traceEnabled()) {
+            return;
+        }
+        $line = '[ConfiguracaoEscolarSeeder] '.$message;
+        Log::info($line);
+        $this->command?->line($line);
+    }
 
     /** @return array{0: int, 1: int} Ano anterior e ano atual */
     private function obterAnosLetivos(): array
@@ -46,9 +82,14 @@ class ConfiguracaoEscolarSeeder extends Seeder
 
     public function run(): void
     {
+        $tInicio = microtime(true);
         [$anoAnterior, $anoAtual] = $this->obterAnosLetivos();
         $anos = [$anoAnterior, $anoAtual];
-        $schools = LegacySchool::all();
+
+        // Apenas colunas usadas no loop — reduz memória com muitas escolas.
+        $schools = LegacySchool::query()
+            ->orderBy('cod_escola')
+            ->get(['cod_escola', 'ref_cod_instituicao']);
 
         if ($schools->isEmpty()) {
             $this->command?->warn('Nenhuma escola encontrada. Execute o setup em um ambiente com escolas cadastradas.');
@@ -56,8 +97,26 @@ class ConfiguracaoEscolarSeeder extends Seeder
             return;
         }
 
+        $totalEscolas = $schools->count();
+        $this->step(sprintf(
+            'Início (anos %d e %d, %d escolas). Trace detalhado: CONFIGURACAO_ESCOLAR_SEEDER_TRACE=true ou `php artisan db:seed ... -v`.',
+            $anoAnterior,
+            $anoAtual,
+            $totalEscolas
+        ));
+
+        $indice = 0;
         foreach ($schools as $school) {
+            /** @var LegacySchool $school */
+            $indice++;
             $instituicaoId = $school->ref_cod_instituicao;
+            $this->trace(sprintf(
+                'Escola %d/%d cod_escola=%s instituicao=%s — criar anos + cursos/vínculos',
+                $indice,
+                $totalEscolas,
+                $school->cod_escola,
+                $instituicaoId ?? 'null'
+            ));
 
             $this->criarAnosLetivos($school, $anos);
             // Apenas garante cursos/séries/vínculos/disciplina por escola.
@@ -66,12 +125,24 @@ class ConfiguracaoEscolarSeeder extends Seeder
             $this->criarCursosEVinculosSemTurmas($school, $instituicaoId, $anos);
         }
 
+        $this->step(sprintf('Loop por escola concluído em %.2fs.', microtime(true) - $tInicio));
+
         $instituicoes = $schools->pluck('ref_cod_instituicao')->unique()->filter()->values();
+        $tInst = microtime(true);
         foreach ($instituicoes as $instituicaoId) {
+            $this->trace('Instituição '.$instituicaoId.' — sequências BNCC (enturmação)');
             $this->garantirSequenciasEnturmacaoBncc((int) $instituicaoId);
+            $this->trace('Instituição '.$instituicaoId.' — sincronizar escola_serie_disciplina');
             $this->garantirEscolaSerieDisciplinasInstituicao((int) $instituicaoId, $anos);
         }
+        $this->step(sprintf(
+            'Pós-processamento por instituição concluído em %.2fs.',
+            microtime(true) - $tInst
+        ));
+
         $this->habilitarBloqueioMatriculaSerieNaoSeguinte($instituicoes->all());
+
+        $this->step(sprintf('Finalizado em %.2fs.', microtime(true) - $tInicio));
     }
 
     /**
@@ -546,6 +617,12 @@ class ConfiguracaoEscolarSeeder extends Seeder
             ->where('ativo', 1)
             ->pluck('cod_escola');
 
+        $idsDisciplina = LegacyDiscipline::query()
+            ->where('instituicao_id', $instituicaoId)
+            ->pluck('id')
+            ->all();
+        $disciplinasDaInstituicao = array_fill_keys($idsDisciplina, true);
+
         foreach ($escolaIds as $codEscola) {
             $seriesIds = LegacySchoolGrade::query()
                 ->where('ref_cod_escola', $codEscola)
@@ -558,8 +635,7 @@ class ConfiguracaoEscolarSeeder extends Seeder
                     ->pluck('componente_curricular_id');
 
                 foreach ($idsComponentes as $codDisciplina) {
-                    $disc = LegacyDiscipline::query()->find($codDisciplina);
-                    if ($disc === null || (int) $disc->instituicao_id !== $instituicaoId) {
+                    if (!isset($disciplinasDaInstituicao[$codDisciplina])) {
                         continue;
                     }
                     $this->sincronizarEscolaSerieDisciplina($codEscola, $codSerie, (int) $codDisciplina, $anos);
