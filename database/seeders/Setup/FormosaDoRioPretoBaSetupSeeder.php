@@ -76,7 +76,6 @@ class FormosaDoRioPretoBaSetupSeeder extends Seeder
             'ref_sigla_uf' => FormosaDoRioPretoBaMunicipalData::UF,
             'cidade' => FormosaDoRioPretoBaMunicipalData::CIDADE,
             'cep' => FormosaDoRioPretoBaMunicipalData::CEP_PADRAO,
-            'orgao_regional' => FormosaDoRioPretoBaMunicipalData::ORGAO_REGIONAL_EDUCACAO,
             'nm_responsavel' => FormosaDoRioPretoBaMunicipalData::SECRETARIO_EDUCACAO,
         ]);
     }
