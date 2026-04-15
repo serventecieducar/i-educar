@@ -71,7 +71,20 @@ class PerfisUsuariosMunicipioSeeder extends Seeder
             );
             $this->grant($smeRelatoriosId, $menusSme, level: 1);
 
-            // 2) Secretaria Escolar — Operacional: pode cadastrar/alterar dados escolares (sem configurações sensíveis).
+            // 2) SME — Apoio (multi-escola): combina SME (consulta) + Secretaria (operacional), sem configurações sensíveis.
+            $smeApoioId = $this->upsertUserType(
+                'SME — Apoio (operacional)',
+                self::NIVEL_INSTITUCIONAL,
+                'Perfil intermediário para equipe da SME que apoia escolas: consulta relatórios/documentos/exportações e também executa rotinas operacionais (alunos, turmas, enturmações), sem acesso a configurações sensíveis.'
+            );
+            $menusSmeApoio = array_merge(
+                $menusSme,
+                $this->descendantMenuIdsWithProcess($ROOT_ESCOLA, $menus, excludeProcesses: $processosSensivesCadastros)
+            );
+            // Operacional: cadastrar/alterar (sem excluir por padrão).
+            $this->grant($smeApoioId, $menusSmeApoio, level: 2, allowDelete: false);
+
+            // 3) Secretaria Escolar — Operacional: pode cadastrar/alterar dados escolares (sem configurações sensíveis).
             $secretarioId = $this->upsertUserType(
                 'Secretaria Escolar — Operacional',
                 self::NIVEL_ESCOLA,
@@ -80,7 +93,7 @@ class PerfisUsuariosMunicipioSeeder extends Seeder
             $menusSecretaria = $this->descendantMenuIdsWithProcess($ROOT_ESCOLA, $menus, excludeProcesses: $processosSensivesCadastros);
             $this->grant($secretarioId, $menusSecretaria, level: 2);
 
-            // 3) Auxiliar de Secretaria — Cadastro básico: cadastra/atualiza, sem excluir.
+            // 4) Auxiliar de Secretaria — Cadastro básico: cadastra/atualiza, sem excluir.
             $auxiliarId = $this->upsertUserType(
                 'Auxiliar de Secretaria — Cadastro básico',
                 self::NIVEL_ESCOLA,
@@ -89,7 +102,7 @@ class PerfisUsuariosMunicipioSeeder extends Seeder
             $menusAuxiliar = $this->descendantMenuIdsWithProcess($ROOT_ESCOLA, $menus, excludeProcesses: $processosSensivesCadastros);
             $this->grant($auxiliarId, $menusAuxiliar, level: 2, allowDelete: false);
 
-            // 4) Direção — Gestão (leitura + algumas ações): acompanha relatórios e faz poucas ações operacionais.
+            // 5) Direção — Gestão (leitura + algumas ações): acompanha relatórios e faz poucas ações operacionais.
             $direcaoId = $this->upsertUserType(
                 'Direção — Gestão escolar',
                 self::NIVEL_ESCOLA,
@@ -105,6 +118,7 @@ class PerfisUsuariosMunicipioSeeder extends Seeder
 
             // Segurança: não atribuir nada em Configurações por padrão.
             $this->revokeFromRoot($smeRelatoriosId, $ROOT_CONFIGURACOES, $menus);
+            $this->revokeFromRoot($smeApoioId, $ROOT_CONFIGURACOES, $menus);
             $this->revokeFromRoot($secretarioId, $ROOT_CONFIGURACOES, $menus);
             $this->revokeFromRoot($auxiliarId, $ROOT_CONFIGURACOES, $menus);
             $this->revokeFromRoot($direcaoId, $ROOT_CONFIGURACOES, $menus);
