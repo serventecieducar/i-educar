@@ -354,8 +354,6 @@ class EnrollmentService
      * Altera o sequencial da matrícula anterior para null
      * e atualiza todos os sequenciais da turma de origem a partir do sequencial do aluno
      * remanejado devem ser atualizados subtraindo 1
-     *
-     * @param DateTime         $date
      */
     public function reorderSchoolClass(LegacyEnrollment $enrollment)
     {
@@ -423,7 +421,7 @@ class EnrollmentService
             ]
         )->validate();
 
-        $enrollment->data_exclusao = $exitDate->format('Y-m-d');
+        $enrollment->data_exclusao = $exitDate;
         $enrollment->save();
     }
 }

@@ -197,6 +197,7 @@ class ItamariBaSetupSeeder extends Seeder
         $escola = LegacySchool::query()->create([
             'ref_usuario_cad' => self::USUARIO_CAD,
             'ref_cod_instituicao' => $instituicaoId,
+            'sigla' => $this->gerarSiglaEscola($inep),
             'ref_idpes' => $person->getKey(),
             'ativo' => 1,
             'situacao_funcionamento' => SituacaoFuncionamento::EM_ATIVIDADE,
@@ -236,12 +237,15 @@ class ItamariBaSetupSeeder extends Seeder
         ]);
 
         $zona = $dados['zona_urbana'] ? 1 : 2;
-        LegacySchool::query()->where('ref_idpes', $idpes)->update([
-            'zona_localizacao' => $zona,
-        ]);
 
         $escola = LegacySchool::query()->where('ref_idpes', $idpes)->first();
         if ($escola !== null) {
+            $payload = ['zona_localizacao' => $zona];
+            if ($escola->sigla === null || $escola->sigla === '') {
+                $payload['sigla'] = $this->gerarSiglaEscola($dados['inep']);
+            }
+            $escola->update($payload);
+
             SchoolInep::query()->updateOrCreate(
                 ['cod_escola' => $escola->getKey()],
                 [
@@ -251,6 +255,12 @@ class ItamariBaSetupSeeder extends Seeder
                 ]
             );
         }
+    }
+
+    /** Sigla única da escola (`pmieducar.escola.sigla`, máx. 20 caracteres, NOT NULL). */
+    private function gerarSiglaEscola(int $inep): string
+    {
+        return substr((string) $inep, 0, 20);
     }
 
     /**

@@ -20,6 +20,7 @@ use App\Models\LegacySchoolClass;
 use App\Models\LegacySchoolClassType;
 use App\Models\LegacySchoolCourse;
 use App\Models\LegacySchoolGrade;
+use App\Models\LegacySchoolGradeDiscipline;
 use App\Models\LegacySequenceGrade;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
@@ -59,12 +60,16 @@ class ConfiguracaoEscolarSeeder extends Seeder
             $instituicaoId = $school->ref_cod_instituicao;
 
             $this->criarAnosLetivos($school, $anos);
-            $this->criarCursosETurmas($school, $instituicaoId, $anos);
+            // Apenas garante cursos/séries/vínculos/disciplina por escola.
+            // A geração de turmas (pmieducar.turma) foi movida para um passo opcional
+            // executado via comando específico antes do período de matrículas.
+            $this->criarCursosEVinculosSemTurmas($school, $instituicaoId, $anos);
         }
 
         $instituicoes = $schools->pluck('ref_cod_instituicao')->unique()->filter()->values();
         foreach ($instituicoes as $instituicaoId) {
             $this->garantirSequenciasEnturmacaoBncc((int) $instituicaoId);
+            $this->garantirEscolaSerieDisciplinasInstituicao((int) $instituicaoId, $anos);
         }
         $this->habilitarBloqueioMatriculaSerieNaoSeguinte($instituicoes->all());
     }
@@ -260,7 +265,7 @@ class ConfiguracaoEscolarSeeder extends Seeder
     }
 
     /** @param array<int> $anos */
-    private function criarCursosETurmas(LegacySchool $school, int $instituicaoId, array $anos): void
+    private function criarCursosEVinculosSemTurmas(LegacySchool $school, int $instituicaoId, array $anos): void
     {
         $regraAvaliacao = LegacyEvaluationRule::query()
             ->where('instituicao_id', $instituicaoId)
@@ -369,11 +374,7 @@ class ConfiguracaoEscolarSeeder extends Seeder
                     $this->vincularRegraAvaliacaoSerie($grade, $regraAvaliacao, $ano);
                 }
                 $this->vincularSerieEscola($school, $grade, $anos);
-                $this->vincularDisciplinasSerie($grade, $config['disciplinas'], $instituicaoId, $anos);
-
-                if ($turmaTipo && $turmaTurno) {
-                    $this->criarTurmas($school, $curso, $grade, $anos, $turmaTipo, $turmaTurno);
-                }
+                $this->vincularDisciplinasSerie($school, $grade, $config['disciplinas'], $instituicaoId, $anos);
             }
         }
     }
@@ -425,10 +426,13 @@ class ConfiguracaoEscolarSeeder extends Seeder
     }
 
     /**
+     * A view relatorio.view_componente_curricular (usada em turma/série) exige pmieducar.escola_serie_disciplina
+     * com o ano da turma em anos_letivos; só modules.componente_curricular_ano_escolar não basta.
+     *
      * @param array<int, array{nome: string, area: string}> $disciplinasConfig Cada item: ['nome' => string, 'area' => string]
      * @param array<int> $anos
      */
-    private function vincularDisciplinasSerie(LegacyGrade $grade, array $disciplinasConfig, int $instituicaoId, array $anos): void
+    private function vincularDisciplinasSerie(LegacySchool $school, LegacyGrade $grade, array $disciplinasConfig, int $instituicaoId, array $anos): void
     {
         $anosPg = $this->anosLetivosParaPg($anos);
         $nomesBncc = [];
@@ -478,6 +482,8 @@ class ConfiguracaoEscolarSeeder extends Seeder
                     'anos_letivos' => $anosPg,
                 ]
             );
+
+            $this->sincronizarEscolaSerieDisciplina($school->cod_escola, $grade->cod_serie, $disciplina->id, $anos);
         }
 
         $this->desativarComponentesNaoBncc($grade, $nomesBncc, $instituicaoId);
@@ -516,6 +522,11 @@ class ConfiguracaoEscolarSeeder extends Seeder
                 ->whereIn('componente_curricular_id', $componentesNaoBncc)
                 ->delete();
 
+            LegacySchoolGradeDiscipline::query()
+                ->where('ref_ref_cod_serie', $grade->cod_serie)
+                ->whereIn('ref_cod_disciplina', $componentesNaoBncc)
+                ->delete();
+
             $this->command?->info(
                 "Componentes curriculares desativados da série '{$grade->nm_serie}': " . $componentesNaoBncc->count()
             );
@@ -523,78 +534,122 @@ class ConfiguracaoEscolarSeeder extends Seeder
     }
 
     /**
-     * Cria turmas para cada série em cada ano letivo (atual e anterior).
+     * Garante escola_serie_disciplina para toda escola/série da instituição que já tenha vínculo em componente_curricular_ano_escolar.
+     * Cobre cursos fora do padrão BNCC do loop principal e bases já parcialmente configuradas.
      *
      * @param array<int> $anos
      */
-    private function criarTurmas(
-        LegacySchool $school,
-        LegacyCourse $curso,
-        LegacyGrade $grade,
-        array $anos,
-        LegacySchoolClassType $turmaTipo,
-        LegacyPeriod $turmaTurno
-    ): void {
-        $instituicaoId = $school->ref_cod_instituicao;
+    private function garantirEscolaSerieDisciplinasInstituicao(int $instituicaoId, array $anos): void
+    {
+        $escolaIds = LegacySchool::query()
+            ->where('ref_cod_instituicao', $instituicaoId)
+            ->where('ativo', 1)
+            ->pluck('cod_escola');
 
-        foreach ($anos as $ano) {
-            $nmTurma = $grade->nm_serie . ' - ' . $ano;
-            $sglTurma = mb_substr($grade->nm_serie, 0, 3) . $ano;
+        foreach ($escolaIds as $codEscola) {
+            $seriesIds = LegacySchoolGrade::query()
+                ->where('ref_cod_escola', $codEscola)
+                ->where('ativo', 1)
+                ->pluck('ref_cod_serie');
 
-            $turma = LegacySchoolClass::firstOrCreate(
-                [
-                    'ref_ref_cod_escola' => $school->cod_escola,
-                    'ref_ref_cod_serie' => $grade->cod_serie,
-                    'ref_cod_curso' => $curso->cod_curso,
-                    'ano' => $ano,
-                ],
-                [
-                    'ref_usuario_cad' => self::USUARIO_CAD,
-                    'nm_turma' => $nmTurma,
-                    'sgl_turma' => $sglTurma,
-                    'max_aluno' => 40,
-                    'ref_cod_turma_tipo' => $turmaTipo->cod_turma_tipo,
-                    'turma_turno_id' => $turmaTurno->id,
-                    'ref_cod_instituicao' => $instituicaoId,
-                    'multiseriada' => false,
-                    'visivel' => true,
-                    'ativo' => 1,
-                    'dias_semana' => [2, 3, 4, 5, 6],
-                ]
-            );
+            foreach ($seriesIds as $codSerie) {
+                $idsComponentes = LegacyDisciplineAcademicYear::query()
+                    ->where('ano_escolar_id', $codSerie)
+                    ->pluck('componente_curricular_id');
 
-            $this->vincularComponentesCurricularesTurma($school, $grade, $turma);
+                foreach ($idsComponentes as $codDisciplina) {
+                    $disc = LegacyDiscipline::query()->find($codDisciplina);
+                    if ($disc === null || (int) $disc->instituicao_id !== $instituicaoId) {
+                        continue;
+                    }
+                    $this->sincronizarEscolaSerieDisciplina($codEscola, $codSerie, (int) $codDisciplina, $anos);
+                }
+            }
         }
     }
 
     /**
-     * Vincula os componentes curriculares (disciplinas BNCC) da série à turma,
-     * permitindo lançamento de notas e faltas no iDiário.
+     * @param array<int> $anosSetup Anos letivos que o setup mantém (atual e anterior); mesclados com ccae e com o que já existe em esd.
      */
-    private function vincularComponentesCurricularesTurma(
-        LegacySchool $school,
-        LegacyGrade $grade,
-        LegacySchoolClass $turma
+    private function sincronizarEscolaSerieDisciplina(
+        int $codEscola,
+        int $codSerie,
+        int $codDisciplina,
+        array $anosSetup
     ): void {
-        $componentesSerie = LegacyDisciplineAcademicYear::query()
-            ->where('ano_escolar_id', $grade->cod_serie)
-            ->get();
+        $ccae = LegacyDisciplineAcademicYear::query()
+            ->where('ano_escolar_id', $codSerie)
+            ->where('componente_curricular_id', $codDisciplina)
+            ->first();
 
-        foreach ($componentesSerie as $ccAno) {
-            LegacyDisciplineSchoolClass::firstOrCreate(
-                [
-                    'componente_curricular_id' => $ccAno->componente_curricular_id,
-                    'turma_id' => $turma->cod_turma,
-                ],
-                [
-                    'ano_escolar_id' => $grade->cod_serie,
-                    'escola_id' => $school->cod_escola,
-                    'carga_horaria' => $ccAno->carga_horaria ?? 40,
-                    'docente_vinculado' => 0,
-                    'etapas_especificas' => 0,
-                    'etapas_utilizadas' => '',
-                ]
-            );
+        if ($ccae === null) {
+            return;
         }
+
+        $existing = LegacySchoolGradeDiscipline::query()
+            ->where('ref_ref_cod_escola', $codEscola)
+            ->where('ref_ref_cod_serie', $codSerie)
+            ->where('ref_cod_disciplina', $codDisciplina)
+            ->first();
+
+        $carga = (int) ($ccae->carga_horaria ?: 40);
+        $anosPg = $this->mesclarAnosLetivosParaCampoPostgres(
+            $existing?->anos_letivos,
+            $ccae->anos_letivos,
+            $anosSetup
+        );
+
+        if ($existing !== null) {
+            $existing->update([
+                'ativo' => 1,
+                'carga_horaria' => $carga,
+                'etapas_especificas' => $existing->etapas_especificas ?? 0,
+                'etapas_utilizadas' => $existing->etapas_utilizadas ?? '',
+                'anos_letivos' => $anosPg,
+            ]);
+
+            return;
+        }
+
+        LegacySchoolGradeDiscipline::query()->create([
+            'ref_ref_cod_escola' => $codEscola,
+            'ref_ref_cod_serie' => $codSerie,
+            'ref_cod_disciplina' => $codDisciplina,
+            'ativo' => 1,
+            'carga_horaria' => $carga,
+            'etapas_especificas' => 0,
+            'etapas_utilizadas' => '',
+            'anos_letivos' => $anosPg,
+        ]);
     }
+
+    /**
+     * @param array<int> $anosExtras
+     */
+    private function mesclarAnosLetivosParaCampoPostgres(mixed $anosEsd, mixed $anosCcae, array $anosExtras): string
+    {
+        $unidos = [];
+
+        foreach ([$anosEsd, $anosCcae] as $origem) {
+            if ($origem === null || $origem === '') {
+                continue;
+            }
+            if (is_array($origem)) {
+                $unidos = array_merge($unidos, $origem);
+
+                continue;
+            }
+            if (is_string($origem)) {
+                $unidos = array_merge($unidos, transformStringFromDBInArray($origem) ?? []);
+            }
+        }
+
+        $unidos = array_merge($unidos, $anosExtras);
+        $unidos = array_values(array_unique(array_map('intval', array_filter($unidos, fn ($v) => $v !== null && $v !== ''))));
+        sort($unidos);
+
+        return '{' . implode(',', $unidos) . '}';
+    }
+
+    // A geração de turmas foi movida para um comando opcional (`setup:matriculas`).
 }

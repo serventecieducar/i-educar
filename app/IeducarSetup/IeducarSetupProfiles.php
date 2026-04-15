@@ -3,6 +3,7 @@
 namespace App\IeducarSetup;
 
 use Database\Seeders\Setup\BelemPaSetupSeeder;
+use Database\Seeders\Setup\FormosaDoRioPretoBaSetupSeeder;
 use Database\Seeders\Setup\FortalezaCeSetupSeeder;
 use Database\Seeders\Setup\ItamariBaSetupSeeder;
 use Database\Seeders\Setup\PortoAlegreRsSetupSeeder;
@@ -62,6 +63,13 @@ final class IeducarSetupProfiles
                 'description' => 'Ajustes e complementos específicos para a rede de Itamari/BA.',
                 'extra_seeders' => [
                     ItamariBaSetupSeeder::class,
+                ],
+            ],
+            'formosa-do-rio-preto-ba' => [
+                'label' => 'Formosa do Rio Preto (BA)',
+                'description' => 'Ajustes e complementos específicos para a rede de Formosa do Rio Preto/BA.',
+                'extra_seeders' => [
+                    FormosaDoRioPretoBaSetupSeeder::class,
                 ],
             ],
         ];

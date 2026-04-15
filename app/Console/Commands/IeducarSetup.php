@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Log;
 class IeducarSetup extends Command
 {
     protected $signature = 'ieducar:setup
-                            {cidade-uf=default-br : Slug cidade-UF (ex.: default-br, itamari-ba, belem-pa)}';
+                            {cidade-uf=default-br : Slug cidade-UF (ex.: default-br, itamari-ba, belem-pa, formosa-do-rio-preto-ba)}';
 
     protected $description = 'Configura o i-Educar por perfil cidade-UF: padrão nacional (default-br) + rotinas municipais opcionais';
 
