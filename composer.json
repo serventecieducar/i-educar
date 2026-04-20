@@ -3,7 +3,6 @@
     "description": "Software livre de gestão escolar",
     "type": "project",
     "license": "GPL-2.0-or-later",
-    "version": "2.10.0",
     "keywords": [
         "Portabilis",
         "i-Educar"
@@ -25,6 +24,7 @@
         "ext-zip": "*",
         "ankurk91/laravel-eloquent-relationships": "^2.1",
         "aws/aws-sdk-php-laravel": "^3.7",
+        "buriti/i-educar-setup-package": "^1.0",
         "composer/semver": "^3.2",
         "dex/composer-plug-and-play": "^0.24",
         "dex/frontier": "^0.16.0",
@@ -47,15 +47,14 @@
         "phpoffice/phpspreadsheet": "^1.8",
         "predis/predis": "^2.3",
         "psr/simple-cache": "^3.0",
+        "serventec/i-educar-advanced-reports-package": "@dev",
+        "serventec/i-educar-gestao-presente-package": "@dev",
+        "serventec/i-educar-govbr-login-package": "@dev",
+        "serventec/i-educar-hamburger-package": "@dev",
         "socialiteproviders/laravelpassport": "^4.3",
         "staudenmeir/laravel-adjacency-list": "^1.0",
         "symfony/http-client": "^6.0",
-        "symfony/mailgun-mailer": "^6.0",
-        "serventec/i-educar-advanced-reports-package": "@dev",
-        "serventec/i-educar-govbr-login-package": "@dev",
-        "serventec/i-educar-hamburger-package": "@dev",
-        "serventec/i-educar-gestao-presente-package": "@dev",
-        "buriti/i-educar-setup-package": "@dev"
+        "symfony/mailgun-mailer": "^6.0"
     },
     "require-dev": {
         "fakerphp/faker": "^1.15",
@@ -103,17 +102,18 @@
         "ieducar/lib",
         "ieducar/modules"
     ],
-    "extra": {
-        "laravel": {
-            "dont-discover": [
-                "laravel/telescope"
-            ]
-        }
-    },
     "repositories": [
         {
             "type": "path",
+            "url": "packages/buriti/i-educar-setup-package"
+        },
+        {
+            "type": "path",
             "url": "packages/serventec/i-educar-advanced-reports-package"
+        },
+        {
+            "type": "path",
+            "url": "packages/serventec/i-educar-gestao-presente-package"
         },
         {
             "type": "path",
@@ -122,19 +122,10 @@
         {
             "type": "path",
             "url": "packages/serventec/i-educar-hamburger-package"
-        },
-        {
-            "type": "path",
-            "url": "packages/serventec/i-educar-gestao-presente-package"
-        },
-        {
-            "type": "path",
-            "url": "packages/buriti/i-educar-setup-package"
         }
     ],
     "scripts": {
         "format": "vendor/bin/pint",
-        "openapi": "vendor/uderline/openapi-php-attributes/opag tests public/openapi.json",
         "set-permissions": "find bootstrap/cache -type d -exec chmod 777 {} + && find storage -type d -exec chmod 777 {} +",
         "new-install": [
             "@composer install",
@@ -161,6 +152,13 @@
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
             "@php artisan package:discover --ansi"
         ]
+    },
+    "extra": {
+        "laravel": {
+            "dont-discover": [
+                "laravel/telescope"
+            ]
+        }
     },
     "config": {
         "preferred-install": "dist",

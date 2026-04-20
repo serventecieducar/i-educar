@@ -3,7 +3,6 @@
 use App\Http\Controllers\EnrollmentInepController;
 use App\Http\Controllers\EnrollmentsPromotionController;
 use App\Http\Controllers\ExportController;
-use App\Http\Controllers\IntegratedAttendanceReportController;
 use App\Http\Controllers\CleanupEmptyActiveSchoolClassesController;
 use App\Http\Controllers\SchoolClassController;
 use App\Http\Controllers\SocialiteCallbackController;
@@ -200,10 +199,6 @@ Route::group(['middleware' => ['ieducar.navigation', 'ieducar.footer', 'ieducar.
 
     Route::post('/enrollments-promotion', [EnrollmentsPromotionController::class, 'processEnrollmentsPromotionJobs'])
         ->name('enrollments.promotion');
-
-    Route::get('/escola/relatorios-integrados/frequencia-alunos', [IntegratedAttendanceReportController::class, 'index'])
-        ->middleware('can:view:' . Process::INTEGRATED_ATTENDANCE_REPORT)
-        ->name('integrated-attendance-report.index');
 
     Route::fallback([WebController::class, 'fallback']);
 });
