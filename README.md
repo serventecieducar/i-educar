@@ -15,6 +15,7 @@ país por meio da educação. Junte-se a nós!**
 - [FAQ](#perguntas-frequentes-faq)
 - [Pacotes (módulos)](#pacotes-módulos)
 - [Upgrade](#upgrade)
+- [Documentação](#documentação)
 
 ## Sobre o i-Educar
 
@@ -76,6 +77,14 @@ pacote, siga as instruções de instalação encontradas no repositório do proj
 ## Upgrade
 
 Para realizar o _upgrade_ da versão do i-Educar, considere seguir os passos no [guia de atualização](UPGRADE.md).
+
+## Documentação
+
+Documentos adicionais estão em [docs/](docs/):
+
+- [Melhorias futuras](docs/MELHORIAS-FUTURAS.md) — documento executivo com eixos de evolução do produto.
+- [Multi-tenant](docs/MULTI-TENANT.md) — estado atual e requisitos para arquitetura multi-tenant e pacotes por tenant.
+- [Tutorial: database.php para multi-tenant](docs/TUTORIAL-DATABASE-MULTITENANT.md) — como configurar o Laravel para um banco por tenant.
 
 ## Perguntas frequentes (FAQ)
 

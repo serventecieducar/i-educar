@@ -6,6 +6,7 @@ instalação siga os passos do [guia de atualização](UPGRADE.md).
 - [Dependências](#dependências)
 - [Instalação utilizando Docker](#instalação-utilizando-docker)
 - [Instalação em servidor web](#instalação-em-servidor-web)
+- [Produção, setup municipal e INEP / Educacenso](#produção-setup-municipal-e-inep--educacenso)
 - [Primeiro acesso](#primeiro-acesso)
 
 ## Dependências
@@ -196,6 +197,28 @@ comando abaixo:
 ```bash 
 php artisan db:seed --class=DemoSeeder
 ```
+
+> **Atenção — `DemoSeeder`:** gera escolas e alunos **fictícios** (factories/Faker). Serve para laboratório. **Não rode em produção** nem depois de configurar um município real com `php artisan ieducar:setup {perfil}` — o comando aborta automaticamente se `APP_ENV=production`.
+
+## Produção, setup municipal e INEP / Educacenso
+
+### Setup estruturado (BNCC, calendário, perfil municipal)
+
+Para popular cursos/séries/turmas/calendário conforme os seeders do projeto **e** um perfil cidade-UF opcional:
+
+```bash
+php artisan ieducar:setup              # padrão nacional (default-br)
+php artisan ieducar:setup itamari-ba     # exemplo: Itamari/BA (instituição + escolas INEP + ajustes locais)
+```
+
+Arquivos principais: `app/Console/Commands/IeducarSetup.php`, `database/seeders/SeederMaster.php`, `app/IeducarSetup/IeducarSetupProfiles.php`, `database/seeders/Setup/*`.
+
+### Checklist produção (resumo)
+
+1. **Ambiente:** `APP_ENV=production`, `APP_DEBUG=false`, `APP_KEY` definido, credenciais fortes de banco e Redis.
+2. **Deploy:** `composer install --no-dev --optimize-autoloader`, `php artisan migrate --force`, caches (`config:cache`, `route:cache`, `view:cache` quando aplicável).
+3. **Dados:** não usar `DemoSeeder`; usar `ieducar:setup` e/ou cadastros oficiais. Conferir instituição, escolas (INEP), vínculos Educacenso no cadastro da escola (endereço IBGE, dependência, regulamentação, etc.) — o setup automatizado **não substitui** todos os campos exigidos pelo Censo Escolar.
+4. **Processos:** filas (`php artisan horizon` ou supervisor), agendador (`schedule:run`), HTTPS, backups do PostgreSQL.
 
 ## Primeiro acesso
 

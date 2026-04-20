@@ -2,55 +2,55 @@
 
 namespace Database\Seeders\Setup;
 
-use App\IeducarSetup\FormosaDoRioPretoBa\FormosaDoRioPretoBaMunicipalData;
+use App\IeducarSetup\ItaparicaBa\ItaparicaBaMunicipalData;
 use App\Models\LegacyAverageFormula;
 use App\Models\LegacyCourse;
-use App\Models\LegacyEvaluationRule;
 use App\Models\LegacyGeneralConfiguration;
 use App\Models\LegacyInstitution;
 use App\Models\LegacySchool;
-use App\Models\LegacyStageType;
+use Database\Seeders\PerfisUsuariosMunicipioSeeder;
+use Database\Seeders\Setup\ItaparicaBaSchoolsSeeder;
+use Database\Seeders\Setup\ItaparicaBaAeeSchoolClassesSeeder;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Setup específico Formosa do Rio Preto/BA.
+ * Setup específico Itaparica/BA, seguindo a mesma lógica de Formosa do Rio Preto/BA.
  *
  * Objetivos (para 2026):
  * - Notas numéricas, 3 trimestres com pesos 30/30/40.
  * - Recuperação paralela com média 60% (6,0) e recuperação final com média 50% (5,0).
- * - Não ofertar Ensino Médio (somente Educação Infantil e Ensino Fundamental).
  * - Todas as escolas com cursos EI + Fundamental habilitados para 2026.
  * - Não criar turmas automaticamente em 2026 (apenas permitir cadastro manual).
  * - Montar calendário (ano letivo modular) em 3 trimestres para 2026.
  *
  * Execução:
- * - `php artisan ieducar:setup formosa-do-rio-preto-ba`
+ * - `php artisan ieducar:setup itaparica-ba`
  *
  * Observações:
  * - Este seeder roda APÓS o seed padrão (SeederMaster). Qualquer ajuste/correção do padrão
  *   para o município deve ser feito aqui.
- * - O seed padrão cria cursos/séries/turmas para ano atual e anterior. Aqui nós:
- *   - mantemos os vínculos escola-curso e escola-série para 2026 (para permitir cadastrar turmas),
- *   - mas desativamos as turmas geradas automaticamente em 2026.
  */
-class FormosaDoRioPretoBaSetupSeeder extends Seeder
+class ItaparicaBaSetupSeeder extends Seeder
 {
     private const USUARIO_CAD = 1;
 
     /** @see \RegraAvaliacao_Model_Nota_TipoValor::NUMERICA */
     private const TIPO_NOTA_NUMERICA = 1;
 
-    /** @see LegacyEvaluationRule::PARALLEL_REMEDIAL_PER_STAGE */
+    /** @see \App\Models\LegacyEvaluationRule::PARALLEL_REMEDIAL_PER_STAGE */
     private const RECUPERACAO_PARALELA_POR_ETAPA = 1;
+
+    /** Sem recuperação paralela (somente recuperação final ao fim do ano). */
+    private const SEM_RECUPERACAO_PARALELA = 0;
 
     public function run(): void
     {
         DB::transaction(function (): void {
             $instituicao = LegacyInstitution::query()->whereKey(1)->first();
             if ($instituicao === null) {
-                $this->command?->error('Instituição cod_instituicao=1 não encontrada. Rode as migrations/seeders base antes do ieducar:setup formosa-do-rio-preto-ba.');
+                $this->command?->error('Instituição cod_instituicao=1 não encontrada. Rode as migrations/seeders base antes do ieducar:setup itaparica-ba.');
 
                 return;
             }
@@ -61,28 +61,36 @@ class FormosaDoRioPretoBaSetupSeeder extends Seeder
             $formulaMediaId = $this->garantirFormulaMediaTrimestres303040((int) $instituicao->getKey());
             $this->aplicarRegraAvaliacaoMunicipal((int) $instituicao->getKey(), $formulaMediaId);
 
-            $this->restringirCursosParaEducacaoInfantilEFundamental((int) $instituicao->getKey());
-            $this->montarCalendarioTrimestral2026((int) $instituicao->getKey(), $moduloTrimestre->cod_modulo);
+            // Importação municipal (CSV) para preencher dados de escolas/INEP/endereço.
+            $this->call(ItaparicaBaSchoolsSeeder::class);
+            $this->call(ItaparicaBaAeeSchoolClassesSeeder::class);
 
+            $this->restringirCursosParaEducacaoInfantilEFundamental((int) $instituicao->getKey());
+            $this->montarCalendarioTrimestral2026((int) $instituicao->getKey(), (int) $moduloTrimestre->cod_modulo);
             $this->desativarTurmasGeradasAutomaticamenteEm2026((int) $instituicao->getKey());
+
+            // Ao final, cria/atualiza tipos de usuários (perfis) municipais e permissões de menu.
+            $this->call(PerfisUsuariosMunicipioSeeder::class);
         });
 
-        Log::channel('daily')->info('ieducar:setup [formosa-do-rio-preto-ba] — rotina municipal concluída.');
+        Log::channel('daily')->info('ieducar:setup [itaparica-ba] — rotina municipal concluída.', [
+            'cidade' => ItaparicaBaMunicipalData::CIDADE,
+        ]);
     }
 
     private function aplicarInstituicaoDadosOficiais(LegacyInstitution $instituicao): void
     {
         $instituicao->update([
-            'nm_instituicao' => FormosaDoRioPretoBaMunicipalData::INSTITUICAO_NOME_OFICIAL,
-            'ref_sigla_uf' => FormosaDoRioPretoBaMunicipalData::UF,
-            'cidade' => FormosaDoRioPretoBaMunicipalData::CIDADE,
-            'cep' => FormosaDoRioPretoBaMunicipalData::CEP_PADRAO,
-            'bairro' => FormosaDoRioPretoBaMunicipalData::ENDERECO_BAIRRO,
-            'logradouro' => FormosaDoRioPretoBaMunicipalData::ENDERECO_LOGRADOURO,
-            'numero' => FormosaDoRioPretoBaMunicipalData::ENDERECO_NUMERO,
-            'ddd_telefone' => FormosaDoRioPretoBaMunicipalData::TELEFONE_DDD,
-            'telefone' => FormosaDoRioPretoBaMunicipalData::TELEFONE_NUMERO,
-            'nm_responsavel' => FormosaDoRioPretoBaMunicipalData::SECRETARIO_EDUCACAO,
+            'nm_instituicao' => ItaparicaBaMunicipalData::INSTITUICAO_NOME_OFICIAL,
+            'ref_sigla_uf' => ItaparicaBaMunicipalData::UF,
+            'cidade' => ItaparicaBaMunicipalData::CIDADE,
+            'cep' => ItaparicaBaMunicipalData::CEP_PADRAO,
+            'bairro' => ItaparicaBaMunicipalData::ENDERECO_BAIRRO,
+            'logradouro' => ItaparicaBaMunicipalData::ENDERECO_LOGRADOURO,
+            'numero' => ItaparicaBaMunicipalData::ENDERECO_NUMERO,
+            'ddd_telefone' => ItaparicaBaMunicipalData::TELEFONE_DDD,
+            'telefone' => ItaparicaBaMunicipalData::TELEFONE_NUMERO,
+            'nm_responsavel' => ItaparicaBaMunicipalData::SECRETARIO_EDUCACAO,
         ]);
     }
 
@@ -90,65 +98,64 @@ class FormosaDoRioPretoBaSetupSeeder extends Seeder
     {
         $rodape = sprintf(
             '<p><strong>%s</strong><br>'
-            .'Prefeito(a): %s<br>'
-            .'Secretário(a) de Educação: %s<br>'
-            .'%s<br>'
-            .'Critérios avaliativos: %s — %s (%d/%d/%d) — Recuperação paralela média %.1f — Recuperação final média %.1f.</p>',
-            e(FormosaDoRioPretoBaMunicipalData::SECRETARIA_OFICIAL),
-            e(FormosaDoRioPretoBaMunicipalData::PREFEITO),
-            e(FormosaDoRioPretoBaMunicipalData::SECRETARIO_EDUCACAO),
-            e(FormosaDoRioPretoBaMunicipalData::ATO_NOMEACAO_SECRETARIO),
-            e(FormosaDoRioPretoBaMunicipalData::FORMA_AVALIATIVA),
+            . 'Prefeito(a): %s<br>'
+            . 'Secretário(a) de Educação: %s<br>'
+            . '%s<br>'
+            . 'Critérios avaliativos: %s — %s (%d/%d/%d) — Recuperação: somente final (média %.1f).</p>',
+            e(ItaparicaBaMunicipalData::SECRETARIA_OFICIAL),
+            e(ItaparicaBaMunicipalData::PREFEITO),
+            e(ItaparicaBaMunicipalData::SECRETARIO_EDUCACAO),
+            e(ItaparicaBaMunicipalData::ATO_NOMEACAO_SECRETARIO),
+            e(ItaparicaBaMunicipalData::FORMA_AVALIATIVA),
             '3 trimestres',
-            FormosaDoRioPretoBaMunicipalData::PESOS_TRIMESTRAIS[0],
-            FormosaDoRioPretoBaMunicipalData::PESOS_TRIMESTRAIS[1],
-            FormosaDoRioPretoBaMunicipalData::PESOS_TRIMESTRAIS[2],
-            FormosaDoRioPretoBaMunicipalData::MEDIA_RECUPERACAO_PARALELA,
-            FormosaDoRioPretoBaMunicipalData::MEDIA_RECUPERACAO_FINAL
+            ItaparicaBaMunicipalData::PESOS_TRIMESTRAIS[0],
+            ItaparicaBaMunicipalData::PESOS_TRIMESTRAIS[1],
+            ItaparicaBaMunicipalData::PESOS_TRIMESTRAIS[2],
+            ItaparicaBaMunicipalData::MEDIA_RECUPERACAO_FINAL
         );
 
         LegacyGeneralConfiguration::query()->updateOrCreate(
             ['ref_cod_instituicao' => $instituicaoId],
             [
-                'ieducar_entity_name' => FormosaDoRioPretoBaMunicipalData::INSTITUICAO_NOME_OFICIAL,
+                'ieducar_entity_name' => ItaparicaBaMunicipalData::INSTITUICAO_NOME_OFICIAL,
                 'ieducar_internal_footer' => $rodape,
             ]
         );
     }
 
-    private function garantirModuloTresTrimestres(int $instituicaoId): LegacyStageType
+    private function garantirModuloTresTrimestres(int $instituicaoId)
     {
-        $modulo = LegacyStageType::query()
+        $modulo = \App\Models\LegacyStageType::query()
             ->where('ref_cod_instituicao', $instituicaoId)
             ->where('ativo', 1)
             ->orderBy('cod_modulo')
             ->first();
 
         if ($modulo === null) {
-            return LegacyStageType::query()->create([
+            return \App\Models\LegacyStageType::query()->create([
                 'ref_usuario_cad' => self::USUARIO_CAD,
                 'nm_tipo' => 'Trimestre',
                 'num_etapas' => 3,
-                'descricao' => 'Três trimestres (30/30/40) — Formosa do Rio Preto/BA',
+                'descricao' => 'Três trimestres (30/30/40) — Itaparica/BA',
                 'ref_cod_instituicao' => $instituicaoId,
                 'ativo' => 1,
                 'data_cadastro' => now(),
             ]);
         }
 
-        LegacyStageType::query()->where('cod_modulo', $modulo->cod_modulo)->update([
+        \App\Models\LegacyStageType::query()->where('cod_modulo', $modulo->cod_modulo)->update([
             'nm_tipo' => 'Trimestre',
             'num_etapas' => 3,
-            'descricao' => 'Três trimestres (30/30/40) — Formosa do Rio Preto/BA',
+            'descricao' => 'Três trimestres (30/30/40) — Itaparica/BA',
         ]);
 
-        /** @var LegacyStageType $modulo */
+        /** @var \App\Models\LegacyStageType $modulo */
         return $modulo->refresh();
     }
 
     private function garantirFormulaMediaTrimestres303040(int $instituicaoId): int
     {
-        $nome = 'Formosa do Rio Preto-BA: Trimestres 30/30/40';
+        $nome = 'Itaparica-BA: Trimestres 30/30/40';
         $formula = '((C1*E1*30) + (C2*E2*30) + (C3*E3*40)) / ((C1*30) + (C2*30) + (C3*40))';
 
         $row = LegacyAverageFormula::query()->where('instituicao_id', $instituicaoId)->where('nome', $nome)->first();
@@ -173,23 +180,22 @@ class FormosaDoRioPretoBaSetupSeeder extends Seeder
 
     private function aplicarRegraAvaliacaoMunicipal(int $instituicaoId, int $formulaMediaId): void
     {
-        // Ajusta a regra quantitativa padrão (id=1) para o regime municipal.
         DB::table('modules.regra_avaliacao')
             ->where('id', 1)
             ->where('instituicao_id', $instituicaoId)
             ->update([
                 // limite do campo: varchar(50)
-                'nome' => 'FdoRioPreto-BA: num 3tri 30/30/40 r6/r5',
+                'nome' => 'Itaparica-BA: num 3tri 30/30/40 r6/r5',
                 'tipo_nota' => self::TIPO_NOTA_NUMERICA,
                 'formula_media_id' => $formulaMediaId,
                 // Mantém a fórmula de recuperação padrão (id=2) do seed nacional.
                 'formula_recuperacao_id' => 2,
-                'media' => FormosaDoRioPretoBaMunicipalData::MEDIA_APROVACAO,
-                'tipo_recuperacao_paralela' => self::RECUPERACAO_PARALELA_POR_ETAPA,
-                'media_recuperacao_paralela' => FormosaDoRioPretoBaMunicipalData::MEDIA_RECUPERACAO_PARALELA,
-                'media_recuperacao' => FormosaDoRioPretoBaMunicipalData::MEDIA_RECUPERACAO_FINAL,
-                // cálculo de recuperação paralela: média entre nota e recuperação
-                'tipo_calculo_recuperacao_paralela' => 2,
+                'media' => ItaparicaBaMunicipalData::MEDIA_APROVACAO,
+                // Itaparica: somente recuperação final ao fim do ano.
+                'tipo_recuperacao_paralela' => self::SEM_RECUPERACAO_PARALELA,
+                'media_recuperacao_paralela' => 0,
+                'media_recuperacao' => ItaparicaBaMunicipalData::MEDIA_RECUPERACAO_FINAL,
+                'tipo_calculo_recuperacao_paralela' => 0,
             ]);
     }
 
@@ -219,18 +225,15 @@ class FormosaDoRioPretoBaSetupSeeder extends Seeder
             ->where('nm_curso', 'Ensino Médio')
             ->first();
 
-        // Garante EI + Fundamental ativos no curso (instituição).
         foreach ([$cursoInfantil, $cursoFundamental] as $curso) {
             if ($curso !== null) {
                 $curso->update(['ativo' => 1]);
             }
         }
 
-        // Desativa Ensino Médio (não ofertado).
         if ($cursoMedio !== null) {
             $cursoMedio->update(['ativo' => 0]);
 
-            // Desativa vínculo escola-curso do Ensino Médio para evitar cadastros.
             DB::table('pmieducar.escola_curso')
                 ->whereIn('ref_cod_escola', $schools->pluck('cod_escola')->all())
                 ->where('ref_cod_curso', $cursoMedio->cod_curso)
@@ -241,7 +244,6 @@ class FormosaDoRioPretoBaSetupSeeder extends Seeder
                 ]);
         }
 
-        // Opcionalmente, restringe a lista de cursos ativos por escola (mantendo EI + Fundamental).
         $permitidos = array_values(array_filter([
             $cursoInfantil?->cod_curso,
             $cursoFundamental?->cod_curso,
@@ -270,11 +272,10 @@ class FormosaDoRioPretoBaSetupSeeder extends Seeder
             return;
         }
 
-        // Datas de referência (ajuste municipal pode ser refinado depois).
         $etapas = [
-            1 => ['inicio' => '2026-02-04', 'fim' => '2026-06-07', 'dias' => 60],
-            2 => ['inicio' => '2026-06-08', 'fim' => '2026-09-07', 'dias' => 60],
-            3 => ['inicio' => '2026-09-08', 'fim' => '2026-12-18', 'dias' => 80],
+            1 => ['inicio' => '2026-03-02', 'fim' => '2026-05-23', 'dias' => 63],
+            2 => ['inicio' => '2026-05-25', 'fim' => '2026-09-05', 'dias' => 69],
+            3 => ['inicio' => '2026-09-09', 'fim' => '2026-12-15', 'dias' => 68],
         ];
 
         foreach ($schools as $school) {
@@ -287,7 +288,6 @@ class FormosaDoRioPretoBaSetupSeeder extends Seeder
                 continue;
             }
 
-            // Substitui (idempotente): remove o calendário modular existente de 2026 para o módulo-alvo.
             DB::table('pmieducar.ano_letivo_modulo')
                 ->where('ref_ref_cod_escola', $school->cod_escola)
                 ->where('ref_ano', 2026)
@@ -311,10 +311,6 @@ class FormosaDoRioPretoBaSetupSeeder extends Seeder
 
     private function desativarTurmasGeradasAutomaticamenteEm2026(int $instituicaoId): void
     {
-        // O seed padrão cria turmas com:
-        // - ref_usuario_cad = 1
-        // - nm_turma = "{nm_serie} - {ano}"
-        // - ano = 2026
         DB::table('pmieducar.turma')
             ->where('ref_cod_instituicao', $instituicaoId)
             ->where('ano', 2026)
@@ -329,3 +325,4 @@ class FormosaDoRioPretoBaSetupSeeder extends Seeder
             ]);
     }
 }
+
