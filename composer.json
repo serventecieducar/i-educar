@@ -34,6 +34,7 @@
         "intervention/image": "^2.6",
         "laravel/framework": "^12.5",
         "laravel/horizon": "^5.15",
+        "laravel/pulse": "^1.7",
         "laravel/sanctum": "^4.0",
         "laravel/socialite": "^5.16",
         "laravel/tinker": "^2.6",
@@ -49,7 +50,13 @@
         "socialiteproviders/laravelpassport": "^4.3",
         "staudenmeir/laravel-adjacency-list": "^1.0",
         "symfony/http-client": "^6.0",
-        "symfony/mailgun-mailer": "^6.0"
+        "symfony/mailgun-mailer": "^6.0",
+        "serventec/i-educar-advanced-reports-package": "@dev",
+        "buriti/i-educar-catraca-frequencia-package": "@dev",
+        "serventec/i-educar-govbr-login-package": "@dev",
+        "serventec/i-educar-hamburger-package": "@dev",
+        "serventec/i-educar-gestao-presente-package": "@dev",
+        "buriti/i-educar-setup-package": "@dev"
     },
     "require-dev": {
         "fakerphp/faker": "^1.15",
@@ -104,6 +111,32 @@
             ]
         }
     },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "packages/serventec/i-educar-advanced-reports-package"
+        },
+        {
+            "type": "path",
+            "url": "packages/buriti/i-educar-catraca-frequencia-package"
+        },
+        {
+            "type": "path",
+            "url": "packages/serventec/i-educar-govbr-login-package"
+        },
+        {
+            "type": "path",
+            "url": "packages/serventec/i-educar-hamburger-package"
+        },
+        {
+            "type": "path",
+            "url": "packages/serventec/i-educar-gestao-presente-package"
+        },
+        {
+            "type": "path",
+            "url": "packages/buriti/i-educar-setup-package"
+        }
+    ],
     "scripts": {
         "format": "vendor/bin/pint",
         "openapi": "vendor/uderline/openapi-php-attributes/opag tests public/openapi.json",
