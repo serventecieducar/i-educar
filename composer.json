@@ -52,7 +52,6 @@
         "symfony/http-client": "^6.0",
         "symfony/mailgun-mailer": "^6.0",
         "serventec/i-educar-advanced-reports-package": "@dev",
-        "buriti/i-educar-catraca-frequencia-package": "@dev",
         "serventec/i-educar-govbr-login-package": "@dev",
         "serventec/i-educar-hamburger-package": "@dev",
         "serventec/i-educar-gestao-presente-package": "@dev",
@@ -115,10 +114,6 @@
         {
             "type": "path",
             "url": "packages/serventec/i-educar-advanced-reports-package"
-        },
-        {
-            "type": "path",
-            "url": "packages/buriti/i-educar-catraca-frequencia-package"
         },
         {
             "type": "path",
