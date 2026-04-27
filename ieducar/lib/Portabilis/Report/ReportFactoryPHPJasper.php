@@ -86,6 +86,7 @@ class Portabilis_Report_ReportFactoryPHPJasper extends Portabilis_Report_ReportF
         }
 
         $this->assertJasperRuntime();
+        $this->assertReportSourcesWritable();
 
         $dataFile = $this->getReportsPath() . time() . '-' . mt_rand();
         $outputFile = $this->getReportsPath() . time() . '-' . mt_rand();
@@ -220,7 +221,7 @@ class Portabilis_Report_ReportFactoryPHPJasper extends Portabilis_Report_ReportF
     }
 
     /**
-     * Falha cedo com mensagem clara (útil em multi-domínio / vários pools FPM).
+     * Falha cedo com mensagem clara (FPM, instalações sem vendor, etc.).
      *
      * @throws Exception
      */
@@ -254,6 +255,30 @@ class Portabilis_Report_ReportFactoryPHPJasper extends Portabilis_Report_ReportF
         if (!is_executable($binary)) {
             throw new Exception(
                 "Relatórios Jasper: sem permissão de execução em {$binary}. chmod +x no servidor."
+            );
+        }
+    }
+
+    /**
+     * O JasperStarter grava ficheiros na pasta de fontes; permissões incorrectas são frequentes com clones novos.
+     *
+     * @throws Exception
+     */
+    private function assertReportSourcesWritable(): void
+    {
+        $dir = rtrim($this->getReportsPath(), '/\\');
+        if (!is_dir($dir)) {
+            throw new Exception(
+                "Relatórios Jasper: pasta de fontes (.jrxml) inexistente: {$dir}. "
+                . 'Execute php artisan community:reports:link ou ajuste REPORTS_SOURCE_PATH no .env. '
+                . 'Comando: php artisan reports:jasper-diagnose'
+            );
+        }
+        if (!is_writable($dir)) {
+            throw new Exception(
+                "Relatórios Jasper: sem permissão de escrita em {$dir}. "
+                . 'O processo precisa de criar ficheiros temporários nesta pasta. Ajuste dono/grupo para o utilizador do PHP-FPM (ex.: www-data) ou chmod. '
+                . 'Comando: php artisan reports:jasper-diagnose'
             );
         }
     }

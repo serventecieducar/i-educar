@@ -150,25 +150,28 @@ php artisan reports:jasper-diagnose
 
 ---
 
-## 9. Vários domínios no mesmo servidor (um funciona, outros não)
+## 9. Várias instalações (um domínio = um `git pull` + uma BD) — uma funciona, outras não
 
-Cenários frequentes:
+Cada domínio tem **pasta própria** no servidor e **base PostgreSQL própria**. O PHP-FPM / `php.ini` pode ser o mesmo; o que muda é o **conteúdo do clone** e da **BD**. Ordem de verificação:
 
-1. **Multi-tenant (`APP_MULTI_TENANT`): configurações por base de dados** — O middleware `LoadSettings` faz `Config::set()` com linhas da tabela **`settings`** da **base do tenant** resolvida pelo subdomínio (`ConnectTenantDatabase`). Chaves como **`legacy.report.default_factory`**, **`legacy.report.source_path`** e outras `legacy.report.*` **substituem** o que está no `config/legacy.php` e no `.env` **só para esse tenant**. Um subdomínio pode ter *Factory principal* / caminhos correctos e outro ter valores antigos, vazios ou errados. O comando `php artisan reports:jasper-diagnose` usa sobretudo o **`DB_CONNECTION` do `.env`**, não o tenant do browser — pode mostrar “tudo OK” e mesmo assim um cliente falhar na web. **Comparar entre bases:**  
-   `SELECT key, value FROM settings WHERE key LIKE 'legacy.report.%' ORDER BY key;`  
-   (executar em **cada** base PostgreSQL ligada a um subdomínio que falhe vs. um que funcione).
+1. **Paridade de código e vendor** — Em **cada** pasta do i-Educar: mesmo branch/commit (`git rev-parse HEAD`), `php composer.phar install` concluído, pasta `vendor/geekcom/phpjasper` presente. O comando `php artisan reports:jasper-diagnose` agora imprime uma tabela **“Paridade de instalação”** (Git, `composer.lock`, `config.php` em cache, `APP_URL`, factory) para **colar lado a lado** com a instalação que funciona.
 
-2. **Um código, vários hostnames, mesmo `php.ini` / mesmo pool** — Se o ponto 1 estiver alinhado e ainda houver diferença, verifica: **bloco `server` / `VirtualHost` diferente** (outro `root` ou symlink), **cache HTTP** (CDN/proxy a servir resposta antiga), **DNS** de um hostname a apontar para outro IP, **ModSecurity / WAF** a bloquear só alguns hosts.
+2. **`bootstrap/cache/config.php`** — Se existir, foi gerado com `config:cache` **nessa** máquina após o `.env` correcto. **Não copies** `bootstrap/cache/*.php` de outro servidor (paths e `env()` ficam errados). Em cada clone: `php artisan config:clear` ou `php artisan config:cache` após ajustar `.env`.
 
-3. **Pool PHP-FPM diferente por `server_name`** (quando não é um único pool) — `disable_functions` / `open_basedir` distintos. Alinha **todos** os pools que servem o i-Educar.
+3. **Symlink do pacote de relatórios** — `ieducar/modules/Reports` deve ser symlink válido para o `ieducar` do pacote. O diagnóstico indica **DESTINO INVÁLIDO** se o link estiver partido. Em cada instalação: `php artisan community:reports:link` (e o mesmo utilizador dono dos ficheiros que o FPM usa).
 
-4. **Várias pastas no disco** (`/var/www/clienteA`, `/var/www/clienteB`) — cada uma precisa de **`php composer.phar install`** actualizado.
+4. **Permissões em `ReportSources/`** — O Jasper grava ficheiros temporários na pasta de fontes. O core agora falha com mensagem explícita se a pasta **não for gravável**. Alinha `chown`/`chmod` com a instalação boa (`www-data` ou o user do pool).
 
-5. **`php artisan config:cache`** — valores de `env()` congelados; evitar variar `REPORTS_*` só por vhost sem rebuild coerente do cache.
+5. **Tabela `settings` (mesmo sem multi-tenant)** — Por pedido HTTP, `LoadSettings` aplica a tabela **`settings` da BD dessa instalação** e pode **sobrepor** `legacy.report.default_factory` e `legacy.report.source_path`. Compare entre instalações:  
+   `SELECT key, value FROM settings WHERE key LIKE 'legacy.report.%' ORDER BY key;`
 
-6. **`JASPER_BIN_DIR`** no `.env` — caminho absoluto partilhado ao binário se o layout de pastas for atípico.
+6. **PHP-FPM vs CLI** — `reports:jasper-diagnose` corre em **CLI**; se `exec` aparecer aí mas falhar na web, confirma `exec` via **phpinfo()** no mesmo vhost (§11).
 
-7. **OPcache** — reload de **todos** os pools PHP-FPM relevantes após deploy.
+7. **Nginx / DNS / CDN** — `root` diferente, cache, IP antigo, ModSecurity (menos frequente que os pontos 1–5).
+
+### Multi-tenant (`APP_MULTI_TENANT=true`)
+
+Se no futuro activarem multi-tenant, o ponto 5 aplica-se **por tenant** (várias bases no mesmo código); o diagnóstico Artisan usa só o `DB_CONNECTION` do `.env`.
 
 ---
 
@@ -200,7 +203,7 @@ Cenários frequentes:
 
 2. **Manter política restritiva** — usar **factory remota** (`Portabilis_Report_ReportsRenderServerFactory` + `REPORTS_URL` / token em `config/legacy.php`), para o Jasper correr **fora** deste PHP (outro serviço ou máquina onde `exec` seja permitido). É o desenho previsto quando não se quer Jasper na app web.
 
-3. **Multi-tenant** — alinhar `settings` por base (`legacy.report.*`); o diagnóstico Artisan reflecte sobretudo `DB_CONNECTION` do `.env`, não cada tenant (ver §9).
+3. **Tabela `settings` por instalação** — alinhar `legacy.report.*` em cada base (ver §9, mesmo sem multi-tenant).
 
 4. **Não substituir `exec` por “desligar a verificação”** no código: isso só mascara a causa; o JasperStarter continua a precisar de executar um binário.
 
