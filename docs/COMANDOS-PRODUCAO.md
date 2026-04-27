@@ -172,6 +172,40 @@ Cenários frequentes:
 
 ---
 
+## 10. Jasper e `exec()`: original Portabilis vs alterações (fork Serventec)
+
+### O que o **upstream** Portabilis faz (`portabilis/i-educar`, branch `2.11`)
+
+- `ReportFactoryPHPJasper` usa **`JasperPHP\JasperPHP`** (pacote Composer **`cossou/jasperphp`**, hoje marcado *abandoned*).
+- Instancia `new JasperPHP` **sem** caminho absoluto ao binário; o vendor chama **`exec()`** no ficheiro `JasperPHP.php` do pacote para correr o **JasperStarter** (Java).
+- **Não existe** verificação prévia `function_exists('exec')`; se `exec` estiver em `disable_functions`, o PHP falha **dentro** do vendor (mensagem pouco clara, por exemplo referência a `JasperPHP\exec()` consoante versão do PHP e do pacote).
+
+### O que mudou neste fork (resumo)
+
+| Tópico | Portabilis (original) | Fork (Serventec / alterações descritas) |
+|--------|----------------------|------------------------------------------|
+| Biblioteca | `cossou/jasperphp` | **`geekcom/phpjasper`** (`PHPJasper\PHPJasper`) |
+| Caminho ao binário | Relativo ao pacote no vendor | **`base_path()`** ou **`JASPER_BIN_DIR`** (`config/legacy.php` → `legacy.report.jasper_bin_dir`) |
+| Antes de gerar PDF | Nada | **`assertJasperRuntime()`** — verifica `function_exists('exec')`, pasta e `+x` do `jasperstarter` |
+| Mensagem “exec indisponível” | Não existe no core | **Nova**, explícita, a orientar FPM / `php artisan reports:jasper-diagnose` |
+
+**Conclusão:** o **requisito** de o PHP poder executar processos externos **já existia** no pacote original; **não** foi introduzido pelo fork. O fork **torna o erro visível cedo** e **corrige** o caminho ao JasperStarter com `geekcom/phpjasper`. **Remover** `assertJasperRuntime()` não “liberta” o `exec`; apenas voltaria a falhar mais tarde, com mensagem pior.
+
+### Abordagens em **hosts** onde o relatório falha com `exec`
+
+1. **Habilitar `exec` no PHP que serve o site (FPM)**  
+   - Em `/etc/php/*/fpm/pool.d/*.conf` (ou `php.ini` do FPM), remover `exec` de `php_admin_value[disable_functions]` / `disable_functions`.  
+   - `sudo systemctl reload php*-fpm`.  
+   - Confirmar **no mesmo pool** do vhost (script `phpinfo()` ou ficheiro temporário com `function_exists('exec')` via HTTP).
+
+2. **Manter política restritiva** — usar **factory remota** (`Portabilis_Report_ReportsRenderServerFactory` + `REPORTS_URL` / token em `config/legacy.php`), para o Jasper correr **fora** deste PHP (outro serviço ou máquina onde `exec` seja permitido). É o desenho previsto quando não se quer Jasper na app web.
+
+3. **Multi-tenant** — alinhar `settings` por base (`legacy.report.*`); o diagnóstico Artisan reflecte sobretudo `DB_CONNECTION` do `.env`, não cada tenant (ver §9).
+
+4. **Não substituir `exec` por “desligar a verificação”** no código: isso só mascara a causa; o JasperStarter continua a precisar de executar um binário.
+
+---
+
 ## Ordem mínima sugerida (deploy típico)
 
 1. `git pull` no core (e no pacote local de relatórios em `packages/serventec/`, se existir).  
