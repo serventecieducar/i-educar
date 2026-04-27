@@ -82,6 +82,7 @@ Para realizar o _upgrade_ da versão do i-Educar, considere seguir os passos no 
 
 Documentos adicionais estão em [docs/](docs/):
 
+- [Comandos em produção](docs/COMANDOS-PRODUCAO.md) — Git, Composer, Artisan, caches e relatórios.
 - [PR Jasper no pacote de relatórios (GitHub)](docs/PR-JASPER-REPORTS-PACKAGE.md) — remover `cossou/jasperphp` do `i-educar-reports-package`.
 - [Melhorias futuras](docs/MELHORIAS-FUTURAS.md) — documento executivo com eixos de evolução do produto.
 - [Multi-tenant](docs/MULTI-TENANT.md) — estado atual e requisitos para arquitetura multi-tenant e pacotes por tenant.
