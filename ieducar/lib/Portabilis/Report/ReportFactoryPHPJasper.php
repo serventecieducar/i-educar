@@ -1,6 +1,6 @@
 <?php
 
-use JasperPHP\JasperPHP;
+use PHPJasper\PHPJasper;
 
 class Portabilis_Report_ReportFactoryPHPJasper extends Portabilis_Report_ReportFactory
 {
@@ -97,17 +97,19 @@ class Portabilis_Report_ReportFactoryPHPJasper extends Portabilis_Report_ReportF
             }
         }
 
-        $builder = new JasperPHP;
+        $jasper = new PHPJasper;
 
         // Compila o arquivo .jrxml caso o arquivo .jasper não exista.
 
         if (file_exists($jasperFile) === false) {
-            $builder->compile($jrxmlFile, $filename, false, false)->execute();
+            $jasper->compile($jrxmlFile, $filename)->execute();
         }
 
         // Com o intuito de manter a compatibilidade até finalizar a migração
         // de todos os relatórios será utilizado o método useJson() para
         // informar qual tipo de data source será utilizado.
+
+        $resourceDir = base_path();
 
         if ($report->useJson()) {
             $data = $report->getJsonData();
@@ -118,36 +120,30 @@ class Portabilis_Report_ReportFactoryPHPJasper extends Portabilis_Report_ReportF
 
             $report->addArg('source', $dataFile);
 
-            $builder->process(
-                $jasperFile,
-                $outputFile,
-                ['pdf'],
-                $report->args,
-                [
-                    'driver' => 'json',
-                    'json_query' => $report->getJsonQuery(),
-                    'data_file' => $dataFile,
-                ],
-                false // Não executar em background garante que o erro será retornado
-            )->execute();
+            $dbConnection = [
+                'driver' => 'json',
+                'data_file' => $dataFile,
+            ];
+            $jsonQuery = $report->getJsonQuery();
+            if ($jsonQuery !== null && $jsonQuery !== '') {
+                $dbConnection['json_query'] = $jsonQuery;
+            }
+
+            $jasper->process($jasperFile, $outputFile, [
+                'format' => ['pdf'],
+                'params' => $report->args,
+                'resources' => $resourceDir,
+                'db_connection' => $dbConnection,
+            ])->execute();
 
             unlink($dataFile);
         } else {
-            $builder->process(
-                $jasperFile,
-                $outputFile,
-                ['pdf'],
-                $report->args,
-                [
-                    'driver' => 'postgres',
-                    'username' => $this->settings['db']->username,
-                    'host' => $this->settings['db']->hostname,
-                    'database' => $this->settings['db']->dbname,
-                    'port' => $this->settings['db']->port,
-                    'password' => $this->settings['db']->password,
-                ],
-                false // Não executar em background garante que o erro será retornado
-            )->execute();
+            $jasper->process($jasperFile, $outputFile, [
+                'format' => ['pdf'],
+                'params' => $report->args,
+                'resources' => $resourceDir,
+                'db_connection' => $this->jasperPostgresDbConnection(),
+            ])->execute();
         }
 
         $outputFile .= '.pdf';
@@ -172,5 +168,30 @@ class Portabilis_Report_ReportFactoryPHPJasper extends Portabilis_Report_ReportF
         if (file_exists($file)) {
             unlink($file);
         }
+    }
+
+    /** @return array<string, mixed> */
+    private function jasperPostgresDbConnection(): array
+    {
+        $db = $this->settings['db'];
+        $conn = ['driver' => 'postgres'];
+
+        if (!empty($db->username)) {
+            $conn['username'] = $db->username;
+        }
+        if (!empty($db->password)) {
+            $conn['password'] = $db->password;
+        }
+        if (!empty($db->hostname)) {
+            $conn['host'] = $db->hostname;
+        }
+        if (!empty($db->dbname)) {
+            $conn['database'] = $db->dbname;
+        }
+        if (!empty($db->port)) {
+            $conn['port'] = $db->port;
+        }
+
+        return $conn;
     }
 }
