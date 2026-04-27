@@ -306,6 +306,46 @@ php_admin_value[error_log] = /var/log/php8.3-fpm-ieducar.log
 
 ---
 
+## 12. Core 2.11: fork vs Portabilis (relatórios) e contornos
+
+Referência: [`portabilis/i-educar`](https://github.com/portabilis/i-educar) branch **`2.11`**.
+
+### 12.1 O que mudou no core (relatórios Jasper)
+
+| Área | Portabilis (original 2.11) | Fork (alterações) |
+|------|---------------------------|-------------------|
+| `composer.json` (raiz) | Dependência `cossou/jasperphp` via pacote de relatórios | **`geekcom/phpjasper`** declarado no core |
+| `ReportFactoryPHPJasper.php` | `JasperPHP\JasperPHP`, sem caminho absoluto ao bin | **`PHPJasper\PHPJasper($binDir)`**, `assertJasperRuntime()`, paths normalizados, opcional escrita em ReportSources |
+| `config/legacy.php` | `report` só com `default_factory`, `source_path`, `remote_factory` | + `jasper_bin_dir` (`JASPER_BIN_DIR`), + `skip_sources_writable_check` (`REPORTS_SKIP_SOURCES_WRITABLE_CHECK`) |
+| Comando Artisan | — | **`reports:jasper-diagnose`** (paridade entre instalações) |
+
+O **fluxo** Portabilis (compilar/processar via JasperStarter + `exec`) **mantém-se**; o fork troca biblioteca abandonada, fixa caminhos e **falha cedo** com mensagens claras. **Não** há substituição do `exec` por outra API no core.
+
+### 12.2 Contornos quando “deixou de funcionar” após actualizar o core
+
+1. **`php composer.phar install`** em **cada** clone + `php artisan community:reports:link` + permissões em `ReportSources/` (ver §9 e `reports:jasper-diagnose`).
+2. **`JASPER_BIN_DIR`** — caminho absoluto ao directório que contém `jasperstarter`, se o `vendor/` não estiver no sítio esperado.
+3. **`REPORTS_SKIP_SOURCES_WRITABLE_CHECK=true`** — só se `is_writable(ReportSources)` for **falso positivo** (alguns NFS); não resolve falta real de permissão.
+4. **Factory remota (sem `exec` na app web)** — no `.env`:  
+   `REPORTS_FACTORY=Portabilis_Report_ReportsRenderServerFactory`  
+   e preencher `REPORTS_URL`, `REPORTS_TOKEN` (`legacy.report.remote_factory`). O PDF gera-se noutro serviço (desenho original do i-Educar).
+5. **Tabela `settings`** — valores `legacy.report.*` por instalação podem sobrepor o `.env`; alinhar com a instalação que funciona (SQL na §9).
+6. **Regredir só em último caso** — voltar ao upstream Portabilis implica **voltar a `cossou/jasperphp`** e código antigo do factory (avisos Composer *abandoned*, caminhos antigos); não é recomendado face ao `geekcom/phpjasper`.
+
+### 12.3 Diff local contra Portabilis (reproduzir no clone)
+
+```bash
+git fetch https://github.com/portabilis/i-educar.git 2.11:refs/remotes/portabilis/2.11
+git diff portabilis/2.11 HEAD -- \
+  ieducar/lib/Portabilis/Report/ReportFactoryPHPJasper.php \
+  config/legacy.php \
+  composer.json
+```
+
+O `composer.lock` diverge em muitas entradas; para Jasper, filtrar no diff ou procurar `geekcom/phpjasper` / `cossou/jasperphp`.
+
+---
+
 ## Ordem mínima sugerida (deploy típico)
 
 1. `git pull` no core (e no pacote local de relatórios em `packages/serventec/`, se existir).  

@@ -86,7 +86,9 @@ class Portabilis_Report_ReportFactoryPHPJasper extends Portabilis_Report_ReportF
         }
 
         $this->assertJasperRuntime();
-        $this->assertReportSourcesWritable();
+        if (! config('legacy.report.skip_sources_writable_check')) {
+            $this->assertReportSourcesWritable();
+        }
 
         $dataFile = $this->getReportsPath() . time() . '-' . mt_rand();
         $outputFile = $this->getReportsPath() . time() . '-' . mt_rand();

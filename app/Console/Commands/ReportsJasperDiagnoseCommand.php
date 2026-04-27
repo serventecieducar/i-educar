@@ -115,6 +115,7 @@ class ReportsJasperDiagnoseCommand extends Command
             ['APP_URL', (string) config('app.url')],
             ['Factory relatórios (config)', (string) config('legacy.report.default_factory')],
             ['JASPER_BIN_DIR efectivo', (string) config('legacy.report.jasper_bin_dir') !== '' ? (string) config('legacy.report.jasper_bin_dir') : '(vazio → vendor padrão)'],
+            ['REPORTS_SKIP_SOURCES_WRITABLE_CHECK', config('legacy.report.skip_sources_writable_check') ? 'true (pré-check de escrita em ReportSources desligado)' : 'false'],
         ];
 
         $this->table(['Item', 'Valor'], $rows);
