@@ -142,6 +142,27 @@ php artisan horizon:terminate
 
 - Núcleo: dependência **`geekcom/phpjasper`** na raiz do i-Educar; binário usado pelos comandos do pacote: `vendor/geekcom/phpjasper/bin/jasperstarter/bin/jasperstarter`.
 - Erros comuns e Artisan `community:reports:*`: [PR-JASPER-REPORTS-PACKAGE.md](PR-JASPER-REPORTS-PACKAGE.md).
+- Diagnóstico (exec, pastas, symlink do módulo, Java no PATH):
+
+```bash
+php artisan reports:jasper-diagnose
+```
+
+---
+
+## 9. Vários domínios no mesmo servidor (um funciona, outros não)
+
+Cenários frequentes:
+
+1. **Um código, vários hostnames (multi-tenant por base de dados)** — o `vendor/` e o Jasper são partilhados. Se um domínio gera PDF e outro não, o mais comum é **pool PHP-FPM diferente por `server_name`**, com **`disable_functions`** ou **`open_basedir`** distintos. Alinha a configuração de **todos** os pools que servem o i-Educar (permite `exec`, inclui `vendor/` e `ieducar/` no `open_basedir` se o usares).
+
+2. **Várias pastas no disco** (`/var/www/clienteA`, `/var/www/clienteB`) — cada uma precisa de **`php composer.phar install`** actualizado; actualizar só uma instância não corrige as outras.
+
+3. **`php artisan config:cache`** — os valores de `env()` ficam “congelados” no momento do cache. Se tentares variar `REPORTS_*` ou `JASPER_*` **por domínio** só via ambiente do Apache/Nginx **sem** rebuild do cache, o comportamento fica inconsistente. Preferir **um `.env` coerente`** por instalação ou voltar a gerar o cache após mudar env.
+
+4. **Caminho absoluto partilhado do Jasper** — em instalações atípicas, define **`JASPER_BIN_DIR`** no `.env` (pasta absoluta que contém o executável `jasperstarter`) para todos os vhosts usarem o mesmo binário independentemente de `cwd`.
+
+5. **OPcache** — após deploy, **reload de todos os pools** PHP-FPM que atendem esses domínios.
 
 ---
 
@@ -152,6 +173,7 @@ php artisan horizon:terminate
 3. `php artisan package:discover --ansi`  
 4. Migrações, se necessário: `php artisan migrate --force`  
 5. `php artisan community:reports:install` (se usarem o pacote de relatórios)  
-6. `php artisan optimize:clear` ou recriar `config:cache` / `route:cache` conforme política do ambiente  
-7. Reload do **PHP-FPM** se OPcache “segurar” código antigo  
-8. `php artisan queue:restart` (e Horizon, se houver)
+6. `php artisan reports:jasper-diagnose` (deve terminar com código 0 em cada instalação / pool relevante)  
+7. `php artisan optimize:clear` ou recriar `config:cache` / `route:cache` conforme política do ambiente  
+8. Reload do **PHP-FPM** (todos os pools do i-Educar) se OPcache “segurar” código antigo  
+9. `php artisan queue:restart` (e Horizon, se houver)

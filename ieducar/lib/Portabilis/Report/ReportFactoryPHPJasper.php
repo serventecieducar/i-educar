@@ -23,7 +23,7 @@ class Portabilis_Report_ReportFactoryPHPJasper extends Portabilis_Report_ReportF
      */
     public function getReportsPath()
     {
-        return config('legacy.report.source_path');
+        return $this->normalizedReportsSourcesDirectory();
     }
 
     /**
@@ -85,6 +85,8 @@ class Portabilis_Report_ReportFactoryPHPJasper extends Portabilis_Report_ReportF
             $report->addArg('logo', $this->logoPath());
         }
 
+        $this->assertJasperRuntime();
+
         $dataFile = $this->getReportsPath() . time() . '-' . mt_rand();
         $outputFile = $this->getReportsPath() . time() . '-' . mt_rand();
         $filename = $this->getReportsPath() . $report->templateName();
@@ -97,7 +99,7 @@ class Portabilis_Report_ReportFactoryPHPJasper extends Portabilis_Report_ReportF
             }
         }
 
-        $jasper = new PHPJasper;
+        $jasper = new PHPJasper($this->resolveJasperBinDirectory());
 
         // Compila o arquivo .jrxml caso o arquivo .jasper não exista.
 
@@ -168,6 +170,97 @@ class Portabilis_Report_ReportFactoryPHPJasper extends Portabilis_Report_ReportF
         if (file_exists($file)) {
             unlink($file);
         }
+    }
+
+    /**
+     * Caminho absoluto das fontes .jrxml (evita falhas com cwd ou paths relativos por vhost).
+     */
+    private function normalizedReportsSourcesDirectory(): string
+    {
+        $path = (string) config('legacy.report.source_path');
+        if ($path === '') {
+            $path = base_path('ieducar/modules/Reports/ReportSources');
+        } elseif (!$this->isAbsolutePath($path)) {
+            $path = base_path($path);
+        }
+
+        $real = realpath(rtrim($path, '/\\'));
+        if ($real !== false) {
+            return $real . DIRECTORY_SEPARATOR;
+        }
+
+        return rtrim($path, '/\\') . DIRECTORY_SEPARATOR;
+    }
+
+    private function isAbsolutePath(string $path): bool
+    {
+        if ($path === '') {
+            return false;
+        }
+        if ($path[0] === '/' || $path[0] === '\\') {
+            return true;
+        }
+
+        return (bool) preg_match('#^[a-zA-Z]:[/\\\\]#', $path);
+    }
+
+    /**
+     * Directório do geekcom/phpjasper que contém o executável jasperstarter (passado ao construtor de PHPJasper).
+     */
+    private function resolveJasperBinDirectory(): string
+    {
+        $configured = (string) config('legacy.report.jasper_bin_dir');
+        if ($configured !== '') {
+            $dir = $this->isAbsolutePath($configured) ? $configured : base_path($configured);
+        } else {
+            $dir = base_path('vendor/geekcom/phpjasper/bin/jasperstarter/bin');
+        }
+
+        return rtrim($dir, '/\\');
+    }
+
+    /**
+     * Falha cedo com mensagem clara (útil em multi-domínio / vários pools FPM).
+     *
+     * @throws Exception
+     */
+    private function assertJasperRuntime(): void
+    {
+        if (!function_exists('exec')) {
+            throw new Exception(
+                'Relatórios Jasper: a função PHP exec() está indisponível neste host/pool. '
+                . 'Verifique disable_functions no php.ini ou no pool PHP-FPM deste domínio (cada vhost pode ter pool diferente). '
+                . 'Comando de diagnóstico: php artisan reports:jasper-diagnose'
+            );
+        }
+
+        $binDir = $this->resolveJasperBinDirectory();
+        if (!is_dir($binDir)) {
+            throw new Exception(
+                "Relatórios Jasper: pasta do JasperStarter inexistente: {$binDir}. "
+                . 'Execute composer install na raiz do i-Educar ou defina JASPER_BIN_DIR (caminho absoluto) em .env. '
+                . 'Comando: php artisan reports:jasper-diagnose'
+            );
+        }
+
+        $binary = $binDir . DIRECTORY_SEPARATOR . $this->jasperStarterExecutableName();
+        if (!is_file($binary)) {
+            throw new Exception(
+                "Relatórios Jasper: executável não encontrado: {$binary}. "
+                . 'Comando: php artisan reports:jasper-diagnose'
+            );
+        }
+
+        if (!is_executable($binary)) {
+            throw new Exception(
+                "Relatórios Jasper: sem permissão de execução em {$binary}. chmod +x no servidor."
+            );
+        }
+    }
+
+    private function jasperStarterExecutableName(): string
+    {
+        return strtoupper(substr(PHP_OS, 0, 3)) === 'WIN' ? 'jasperstarter.exe' : 'jasperstarter';
     }
 
     /** @return array<string, mixed> */
