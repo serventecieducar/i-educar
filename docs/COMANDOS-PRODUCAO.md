@@ -206,6 +206,103 @@ Cenários frequentes:
 
 ---
 
+## 11. `php.ini` / PHP-FPM: permitir `exec()` para o Jasper
+
+O **PHP CLI** (`php -i`) e o **PHP-FPM** (pedidos HTTP) usam ficheiros **diferentes**. O i-Educar nos relatórios usa o **FPM**. Ajusta a **versão** (`8.2`, `8.3`, …) e caminhos ao teu servidor (Debian/Ubuntu como referência).
+
+### 11.1 Onde editar
+
+| Contexto | Ficheiro típico |
+|------------|-----------------|
+| PHP-FPM global | `/etc/php/8.3/fpm/php.ini` |
+| Pool de um site (recomendado) | `/etc/php/8.3/fpm/pool.d/www.conf` ou `pool.d/ieducar.conf` |
+| Apache `mod_php` (raro hoje) | `/etc/php/8.3/apache2/php.ini` |
+
+Depois de gravar: `sudo systemctl reload php8.3-fpm`.
+
+### 11.2 Directiva principal: `disable_functions`
+
+O Jasper (`geekcom/phpjasper`) precisa de **`exec()`**. Não pode constar em `disable_functions`.
+
+**Exemplo — comentar a linha global** (em `fpm/php.ini`):
+
+```ini
+; Lista vazia = nenhuma função de sistema desactivada (máximo permissivo; só em ambientes controlados)
+disable_functions =
+
+; OU, se quiseres manter outras restrições, define uma lista SEM exec, shell_exec, proc_open, passthru, system
+; (o Jasper usa sobretudo exec; outras partes do Laravel/podem usar proc_open)
+disable_functions = pcntl_alarm,pcntl_fork,pcntl_waitpid,pcntl_wait,pcntl_wifexited,pcntl_wifstopped,pcntl_wifsignaled,pcntl_wexitstatus,pcntl_wtermsig,pcntl_wstopsig,pcntl_signal,pcntl_signal_dispatch,pcntl_get_last_error,pcntl_strerror,pcntl_sigprocmask,pcntl_sigwaitinfo,pcntl_sigtimedwait,pcntl_exec,pcntl_getpriority,pcntl_setpriority
+```
+
+**Importante:** se existir **outra** linha `disable_functions` mais abaixo ou no **pool**, a mais específica pode **sobrepor**. Grep ajuda:
+
+```bash
+sudo grep -R "disable_functions" /etc/php/8.3/fpm/
+```
+
+### 11.3 Pool FPM (exemplo de bloco)
+
+Ficheiro: `/etc/php/8.3/fpm/pool.d/ieducar.conf` (nome à escolha). Ajusta `user`, `group`, `listen` e caminhos.
+
+```ini
+[ieducar]
+user = www-data
+group = www-data
+listen = /run/php/php8.3-fpm-ieducar.sock
+listen.owner = www-data
+listen.group = www-data
+pm = dynamic
+pm.max_children = 50
+pm.start_servers = 5
+pm.min_spare_servers = 5
+pm.max_spare_servers = 35
+
+; Garantir que exec (e o que o Laravel/Jasper precisarem) NÃO estão na lista
+php_admin_value[disable_functions] = pcntl_alarm,pcntl_fork,pcntl_waitpid
+; Se esta linha existir com "exec" na lista, remove "exec", "shell_exec", "proc_open", "passthru", "system" conforme necessidade.
+
+; Opcional: PHP consegue invocar java no PATH do worker
+env[PATH] = /usr/local/bin:/usr/bin:/bin
+```
+
+Se o pool **não** definir `php_admin_value[disable_functions]`, herda o `php.ini` do FPM.
+
+### 11.4 `open_basedir` (só se estiver activo)
+
+Se usares `open_basedir`, tem de incluir **pelo menos**:
+
+- raiz do projecto i-Educar (onde está `vendor/` e `ieducar/`);
+- `/tmp` (ficheiros temporários de relatório);
+- pastas do Java (`which java` / `readlink -f $(which java)`).
+
+Exemplo ilustrativo (**uma única linha**, separador `:` no Linux):
+
+```ini
+php_admin_value[open_basedir] = /home/serventec/central-ba.serventecassessoria.com.br/:/tmp/:/usr/lib/jvm/
+```
+
+Erros típicos: esquecer o `vendor/geekcom` ou o symlink `ieducar/modules/Reports` dentro da raiz — tudo tem de cair **dentro** dos prefixos permitidos.
+
+### 11.5 Outras directivas úteis (opcional)
+
+```ini
+; Relatórios grandes / Jasper
+memory_limit = 512M
+max_execution_time = 120
+
+; Log de erros do pool (caminho à escolha)
+php_admin_value[error_log] = /var/log/php8.3-fpm-ieducar.log
+```
+
+### 11.6 Verificação
+
+1. `php -i | grep disable_functions` — reflecte **CLI**, não FPM.  
+2. `phpinfo()` servido **pelo mesmo vhost** / pool, ou ficheiro temporário com `<?php var_export(function_exists('exec'));`.  
+3. `php artisan reports:jasper-diagnose` no servidor (mesmo utilizador do pool, se possível: `sudo -u www-data …`).
+
+---
+
 ## Ordem mínima sugerida (deploy típico)
 
 1. `git pull` no core (e no pacote local de relatórios em `packages/serventec/`, se existir).  
