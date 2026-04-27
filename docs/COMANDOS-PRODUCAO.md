@@ -154,15 +154,21 @@ php artisan reports:jasper-diagnose
 
 Cenários frequentes:
 
-1. **Um código, vários hostnames (multi-tenant por base de dados)** — o `vendor/` e o Jasper são partilhados. Se um domínio gera PDF e outro não, o mais comum é **pool PHP-FPM diferente por `server_name`**, com **`disable_functions`** ou **`open_basedir`** distintos. Alinha a configuração de **todos** os pools que servem o i-Educar (permite `exec`, inclui `vendor/` e `ieducar/` no `open_basedir` se o usares).
+1. **Multi-tenant (`APP_MULTI_TENANT`): configurações por base de dados** — O middleware `LoadSettings` faz `Config::set()` com linhas da tabela **`settings`** da **base do tenant** resolvida pelo subdomínio (`ConnectTenantDatabase`). Chaves como **`legacy.report.default_factory`**, **`legacy.report.source_path`** e outras `legacy.report.*` **substituem** o que está no `config/legacy.php` e no `.env` **só para esse tenant**. Um subdomínio pode ter *Factory principal* / caminhos correctos e outro ter valores antigos, vazios ou errados. O comando `php artisan reports:jasper-diagnose` usa sobretudo o **`DB_CONNECTION` do `.env`**, não o tenant do browser — pode mostrar “tudo OK” e mesmo assim um cliente falhar na web. **Comparar entre bases:**  
+   `SELECT key, value FROM settings WHERE key LIKE 'legacy.report.%' ORDER BY key;`  
+   (executar em **cada** base PostgreSQL ligada a um subdomínio que falhe vs. um que funcione).
 
-2. **Várias pastas no disco** (`/var/www/clienteA`, `/var/www/clienteB`) — cada uma precisa de **`php composer.phar install`** actualizado; actualizar só uma instância não corrige as outras.
+2. **Um código, vários hostnames, mesmo `php.ini` / mesmo pool** — Se o ponto 1 estiver alinhado e ainda houver diferença, verifica: **bloco `server` / `VirtualHost` diferente** (outro `root` ou symlink), **cache HTTP** (CDN/proxy a servir resposta antiga), **DNS** de um hostname a apontar para outro IP, **ModSecurity / WAF** a bloquear só alguns hosts.
 
-3. **`php artisan config:cache`** — os valores de `env()` ficam “congelados” no momento do cache. Se tentares variar `REPORTS_*` ou `JASPER_*` **por domínio** só via ambiente do Apache/Nginx **sem** rebuild do cache, o comportamento fica inconsistente. Preferir **um `.env` coerente`** por instalação ou voltar a gerar o cache após mudar env.
+3. **Pool PHP-FPM diferente por `server_name`** (quando não é um único pool) — `disable_functions` / `open_basedir` distintos. Alinha **todos** os pools que servem o i-Educar.
 
-4. **Caminho absoluto partilhado do Jasper** — em instalações atípicas, define **`JASPER_BIN_DIR`** no `.env` (pasta absoluta que contém o executável `jasperstarter`) para todos os vhosts usarem o mesmo binário independentemente de `cwd`.
+4. **Várias pastas no disco** (`/var/www/clienteA`, `/var/www/clienteB`) — cada uma precisa de **`php composer.phar install`** actualizado.
 
-5. **OPcache** — após deploy, **reload de todos os pools** PHP-FPM que atendem esses domínios.
+5. **`php artisan config:cache`** — valores de `env()` congelados; evitar variar `REPORTS_*` só por vhost sem rebuild coerente do cache.
+
+6. **`JASPER_BIN_DIR`** no `.env` — caminho absoluto partilhado ao binário se o layout de pastas for atípico.
+
+7. **OPcache** — reload de **todos** os pools PHP-FPM relevantes após deploy.
 
 ---
 

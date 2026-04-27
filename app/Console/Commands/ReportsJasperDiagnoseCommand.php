@@ -3,6 +3,8 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class ReportsJasperDiagnoseCommand extends Command
 {
@@ -13,6 +15,10 @@ class ReportsJasperDiagnoseCommand extends Command
     public function handle(): int
     {
         $this->line('Base path: '.base_path());
+        $this->line('Ligação DB (Artisan): '.config('database.default'));
+        if (config('app.multi_tenant')) {
+            $this->warn('APP_MULTI_TENANT=true: na web, legacy.report.* vem da tabela settings de CADA base (subdomínio). Este diagnóstico reflecte sobretudo o .env e a ligação default acima.');
+        }
         $this->newLine();
 
         $rows = [
@@ -44,7 +50,10 @@ class ReportsJasperDiagnoseCommand extends Command
         }
         $this->line('Java (command -v): '.$java);
         $this->newLine();
-        $this->comment('Em vários domínios no mesmo servidor: cada pool PHP-FPM pode ter disable_functions diferente. Corra este comando no mesmo utilizador/pool do site que falha.');
+
+        $this->printReportSettingsOverrides();
+
+        $this->comment('Em vários domínios: pool FPM pode diferir; em multi-tenant, compare a tabela settings entre bases (legacy.report.*).');
 
         $jasperOk = function_exists('exec') && is_dir($binDir) && is_file($binary) && is_executable($binary);
         if (!is_dir($sources)) {
@@ -89,5 +98,35 @@ class ReportsJasperDiagnoseCommand extends Command
         }
 
         return (bool) preg_match('#^[a-zA-Z]:[/\\\\]#', $path);
+    }
+
+    private function printReportSettingsOverrides(): void
+    {
+        try {
+            if (!Schema::hasTable('settings')) {
+                return;
+            }
+
+            $keys = [
+                'legacy.report.default_factory',
+                'legacy.report.source_path',
+            ];
+
+            $rows = DB::table('settings')
+                ->whereIn('key', $keys)
+                ->orderBy('key')
+                ->get(['key', 'value']);
+
+            if ($rows->isEmpty()) {
+                $this->line('Tabela settings: sem chaves legacy.report.default_factory / source_path (usa só config/.env).');
+
+                return;
+            }
+
+            $this->warn('Sobreposições em settings (ligação actual — pode não ser o tenant do subdomínio que falha):');
+            $this->table(['key', 'value'], $rows->map(fn ($r) => [$r->key, (string) $r->value])->all());
+        } catch (\Throwable $e) {
+            $this->line('Tabela settings: não foi possível ler ('.$e->getMessage().').');
+        }
     }
 }
