@@ -174,10 +174,20 @@ return new class extends clsCadastro
             'value' => $this->tamanho_min_rede_estadual,
         ]);
 
-        $teacherReporcCard = app(TeacherReportCard::class);
+        $teacherReporcCard = app()->bound(TeacherReportCard::class)
+            ? app(TeacherReportCard::class)
+            : null;
+
+        // Fallback para não quebrar a tela quando o provider de relatórios não estiver carregado.
+        // Os valores numéricos aqui seguem o campo legado `pmieducar.configuracoes_gerais.modelo_boletim_professor`.
+        $fallbackResources = [
+            1 => 'Modelo padrão',
+            2 => 'Modelo rec. por etapa',
+            3 => 'Modelo rec. específica',
+        ];
         $options = [
             'label' => 'Modelo do boletim do professor',
-            'resources' => $teacherReporcCard->getOptions(),
+            'resources' => $teacherReporcCard ? $teacherReporcCard->getOptions() : $fallbackResources,
             'value' => $this->modelo_boletim_professor,
         ];
 

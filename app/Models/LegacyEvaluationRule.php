@@ -65,6 +65,20 @@ class LegacyEvaluationRule extends Model
     ];
 
     /**
+     * Coluna legada `nome` é varchar(50). Garante que valores vindos de setup/seeders não estourem o limite.
+     */
+    public function setNomeAttribute(?string $value): void
+    {
+        if ($value === null) {
+            $this->attributes['nome'] = null;
+
+            return;
+        }
+
+        $this->attributes['nome'] = mb_substr($value, 0, 50);
+    }
+
+    /**
      * @return HasMany<LegacyRemedialRule, $this>
      */
     public function remedialRules(): HasMany

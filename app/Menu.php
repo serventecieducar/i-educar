@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection as LaravelCollection;
+use Illuminate\Support\Str;
 use Staudenmeir\LaravelAdjacencyList\Eloquent\HasRecursiveRelationships;
 
 /**
@@ -223,8 +224,25 @@ class Menu extends Model
                 return $collect;
             }
 
+            $title = $this->title;
+
+            // Em "Tipos de usuário", padroniza identificação dos menus do pacote de relatórios
+            // para facilitar busca/gestão (sem alterar o menu exibido no sistema).
+            if (!empty($this->link) && Str::startsWith($this->link, '/relatorios-avancados')) {
+                $segments = array_values(array_filter(array_map('trim', explode('>', (string) $this->description))));
+                $block = $segments[count($segments) - 2] ?? null;
+
+                $slug = 'report-';
+                if ($block) {
+                    $slug .= Str::slug($block, '-') . '-';
+                }
+                $slug .= Str::slug($title, '-');
+
+                $title = $slug;
+            }
+
             $collect->push(new LaravelCollection([
-                'title' => $this->title,
+                'title' => $title,
                 'description' => $this->description,
                 'link' => $this->link,
                 'process' => $this->id,

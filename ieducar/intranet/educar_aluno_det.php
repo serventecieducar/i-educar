@@ -7,6 +7,7 @@ use App\Models\LegacyBenefit;
 use App\Models\LegacyDeficiency;
 use App\Models\LegacyProject;
 use App\Models\LegacyRace;
+use App\Models\LegacyRegistration;
 use App\Models\PersonHasPlace;
 use App\Models\Religion;
 use App\Models\TransportationProvider;
@@ -674,6 +675,38 @@ return new class extends clsDetalhe
                 array_unshift($this->array_botao, $titulo);
                 array_unshift($this->array_botao_url_script, $link);
             }
+        }
+
+        // Impressão de comprovantes por matrícula ativa (atalho para documentos oficiais do pacote Advanced Reports)
+        try {
+            $activeRegistrations = LegacyRegistration::query()
+                ->where('ref_cod_aluno', $this->cod_aluno)
+                ->where('ativo', 1)
+                ->orderByDesc('ano')
+                ->limit(20)
+                ->get(['cod_matricula', 'ano']);
+
+            if ($activeRegistrations->count() > 0) {
+                $html = '<div style="margin: 14px 0; padding: 10px; border: 1px solid #ddd; background: #fafafa;">';
+                $html .= '<strong>Documentos oficiais (impressão rápida)</strong><br />';
+                $html .= '<div style="margin-top: 8px;">';
+
+                foreach ($activeRegistrations as $reg) {
+                    $matriculaId = (int) $reg->cod_matricula;
+                    $ano = (string) ($reg->ano ?? '');
+                    $url = URL::to('/relatorios-avancados/documentos/pdf') . '?document=declaration_enrollment&matricula_id=' . $matriculaId;
+
+                    $html .= '<div style="margin-bottom: 6px;">';
+                    $html .= '<strong>Matrícula ' . $matriculaId . '</strong>' . ($ano ? (' — ' . $ano) : '') . ': ';
+                    $html .= '<a target="_blank" href="' . e($url) . '">Imprimir comprovante de matrícula</a>';
+                    $html .= '</div>';
+                }
+
+                $html .= '</div></div>';
+                $this->addHtml($html);
+            }
+        } catch (\Throwable $e) {
+            // Silencioso: não deve quebrar a tela de detalhe do aluno caso o pacote/rota não esteja disponível.
         }
 
         $objFichaMedica = new clsModulesFichaMedicaAluno(ref_cod_aluno: $this->cod_aluno);

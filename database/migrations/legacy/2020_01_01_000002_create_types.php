@@ -14,13 +14,16 @@ class CreateTypes extends Migration
     {
         DB::unprepared(
             '
-                CREATE TYPE public.typ_idlog AS (
-                    idlog integer
-                );
+                DO $$
+                BEGIN
+                  IF NOT EXISTS (SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace WHERE t.typname = \'typ_idlog\' AND n.nspname = \'public\') THEN
+                    CREATE TYPE public.typ_idlog AS (idlog integer);
+                  END IF;
 
-                CREATE TYPE public.typ_idpes AS (
-                    idpes integer
-                );
+                  IF NOT EXISTS (SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace WHERE t.typname = \'typ_idpes\' AND n.nspname = \'public\') THEN
+                    CREATE TYPE public.typ_idpes AS (idpes integer);
+                  END IF;
+                END $$;
             '
         );
     }
@@ -34,9 +37,8 @@ class CreateTypes extends Migration
     {
         DB::unprepared(
             '
-                DROP TYPE public.typ_idlog;
-
-                DROP TYPE public.typ_idpes;
+                DROP TYPE IF EXISTS public.typ_idlog;
+                DROP TYPE IF EXISTS public.typ_idpes;
             '
         );
     }

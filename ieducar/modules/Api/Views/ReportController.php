@@ -112,6 +112,12 @@ class ReportController extends ApiCoreController
     protected function getBoletimProfessor()
     {
         if ($this->canGetBoletimProfessor()) {
+            if (!app()->bound(TeacherReportCard::class)) {
+                return [
+                    'error' => 'Relatório não disponível: implementação de TeacherReportCard não registrada no container.',
+                ];
+            }
+
             $boletimProfessorReport = app(TeacherReportCard::class);
 
             $boletimProfessorReport->addArg('ano', (int) $this->getRequest()->ano);
