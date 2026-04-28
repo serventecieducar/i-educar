@@ -23,6 +23,8 @@ function fixupTabelaMatriculas() {
   if($j('#can_show_dependencia').val() == 1)
     $j('<th>').html(stringUtils.toUtf8('Dependência')).appendTo($tr);
 
+  $j('<th>').html(stringUtils.toUtf8('Comprovante')).appendTo($tr);
+
   $tr.appendTo($table);
   $table.appendTo($parentTd);
 }
@@ -129,6 +131,18 @@ var handleGetMatriculas = function(dataResponse) {
         var dependencia = matricula.dependencia ? 'Sim' : stringUtils.toUtf8('Não');
         $j('<td>').html(dependencia).appendTo($tr);
       }
+
+      // Coluna: imprimir comprovante de matrícula (Advanced Reports)
+      (function () {
+        var url = '/relatorios-avancados/documentos/pdf?document=declaration_enrollment&matricula_id=' + matricula.id;
+        var $a = $j('<a>')
+          .attr('href', url)
+          .attr('target', '_blank')
+          .addClass('decorated')
+          .css({'display': 'inline-block', 'padding': '2px 8px'})
+          .html(stringUtils.toUtf8('Imprimir'));
+        $j('<td>').append($a).appendTo($tr).addClass('center');
+      })();
 
       $tr.appendTo($matriculasTable);
     });
