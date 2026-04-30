@@ -39,6 +39,7 @@ class StudentFormsTest extends TestCase
 
         $this->get('/relatorios-avancados/fichas/ficha-individual/pdf?preview=1&ano=2026')->assertOk();
         $this->get('/relatorios-avancados/fichas/ficha-matricula/pdf?preview=1&ano=2026')->assertOk();
+        $this->get('/relatorios-avancados/fichas/termo-autorizacao/pdf?preview=1&ano=2026')->assertOk();
     }
 
     public function test_preview_does_not_persist_document_record(): void
@@ -49,6 +50,7 @@ class StudentFormsTest extends TestCase
 
         $this->get('/relatorios-avancados/fichas/ficha-individual/pdf?preview=1&ano=2026')->assertOk();
         $this->get('/relatorios-avancados/fichas/ficha-matricula/pdf?preview=1&ano=2026')->assertOk();
+        $this->get('/relatorios-avancados/fichas/termo-autorizacao/pdf?preview=1&ano=2026')->assertOk();
 
         $this->assertSame(0, AdvancedReportsDocument::query()->count());
     }
@@ -62,7 +64,11 @@ class StudentFormsTest extends TestCase
         $issuedAt = now();
         $issuedAtIso = DocumentSigningService::issuedAtForMac($issuedAt);
 
-        foreach (['student_form:individual' => 'Ficha individual', 'student_form:enrollment' => 'Ficha de matrícula'] as $type => $label) {
+        foreach ([
+            'student_form:individual' => 'Ficha individual',
+            'student_form:enrollment' => 'Ficha de matrícula',
+            'student_form:media_authorization' => 'Termo de autorização de uso de imagem e voz',
+        ] as $type => $label) {
             $code = strtoupper(bin2hex(random_bytes(8)));
             $payload = [
                 'issuer_name' => 'Emissor (Teste)',
