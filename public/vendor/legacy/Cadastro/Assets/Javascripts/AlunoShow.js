@@ -134,14 +134,16 @@ var handleGetMatriculas = function(dataResponse) {
         $j('<td>').html(dependencia).appendTo($tr);
       }
 
-      // Coluna: documentos (Advanced Reports) — transferidos: folha de matrícula + declaração na mesma emissão
+      // Coluna: documentos (Advanced Reports) — transferidos: comprovante + guia; aprovados: matrícula + conclusão (ficha)
       (function () {
-        var isTransferido = Number(matricula.codigo_situacao) === 4;
-        var doc = isTransferido ? 'transfer_packet' : 'declaration_enrollment';
+        var cod = Number(matricula.codigo_situacao);
+        var isTransferido = cod === 4;
+        var isAprovado = cod === 1 || cod === 12 || cod === 13;
+        var doc = isTransferido ? 'transfer_packet' : (isAprovado ? 'approval_packet' : 'declaration_enrollment');
         var url = '/relatorios-avancados/documentos/pdf?document=' + doc + '&matricula_id=' + matricula.id;
         var label = isTransferido
           ? stringUtils.toUtf8('Matrícula + transf.')
-          : stringUtils.toUtf8('Comprovante');
+          : (isAprovado ? stringUtils.toUtf8('Matrícula + conclusão') : stringUtils.toUtf8('Comprovante'));
         var $a = $j('<a>')
           .attr('href', url)
           .attr('target', '_blank')
