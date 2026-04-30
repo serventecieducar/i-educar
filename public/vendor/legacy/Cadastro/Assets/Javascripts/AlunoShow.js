@@ -23,7 +23,7 @@ function fixupTabelaMatriculas() {
   if($j('#can_show_dependencia').val() == 1)
     $j('<th>').html(stringUtils.toUtf8('Dependência')).appendTo($tr);
 
-  $j('<th>').html(stringUtils.toUtf8('Comprovante')).appendTo($tr);
+  $j('<th>').html(stringUtils.toUtf8('Documentos')).appendTo($tr);
 
   $tr.appendTo($table);
   $table.appendTo($parentTd);
@@ -63,6 +63,7 @@ var handleGetMatriculas = function(dataResponse) {
       $j('<td>').html(linkToMatricula).appendTo($tr).addClass('center');
       $j('<td>').html(matricula.ano).appendTo($tr);
 
+      var $tdSituacao = $j('<td>');
       if(matricula.user_can_change_situacao){
         var situacoes = [
               {val: 1, text: 'Aprovado'},
@@ -86,11 +87,12 @@ var handleGetMatriculas = function(dataResponse) {
         sel.bind('change', function(){
           onSituacaoChange(matricula.id, $j(this).val());
         });
-        sel.appendTo($tr);
+        sel.appendTo($tdSituacao);
 
       }else{
-        $j('<td>').html(matricula.situacao).appendTo($tr);
+        $tdSituacao.html(matricula.situacao);
       }
+      $tdSituacao.appendTo($tr);
 
 
       $j('<td nowrap>').html(`<a style="color:#47728f; padding: 0 8px;" target="_blank" href="/intranet/educar_turma_det.php?cod_turma=${matricula.turma_id}">${matricula.turma_nome ?? ''}</a>`).appendTo($tr);
@@ -132,15 +134,20 @@ var handleGetMatriculas = function(dataResponse) {
         $j('<td>').html(dependencia).appendTo($tr);
       }
 
-      // Coluna: imprimir comprovante de matrícula (Advanced Reports)
+      // Coluna: documentos (Advanced Reports) — transferidos: folha de matrícula + declaração na mesma emissão
       (function () {
-        var url = '/relatorios-avancados/documentos/pdf?document=declaration_enrollment&matricula_id=' + matricula.id;
+        var isTransferido = Number(matricula.codigo_situacao) === 4;
+        var doc = isTransferido ? 'transfer_packet' : 'declaration_enrollment';
+        var url = '/relatorios-avancados/documentos/pdf?document=' + doc + '&matricula_id=' + matricula.id;
+        var label = isTransferido
+          ? stringUtils.toUtf8('Matrícula + transf.')
+          : stringUtils.toUtf8('Comprovante');
         var $a = $j('<a>')
           .attr('href', url)
           .attr('target', '_blank')
           .addClass('decorated')
-          .css({'display': 'inline-block', 'padding': '2px 8px'})
-          .html(stringUtils.toUtf8('Imprimir'));
+          .css({'display': 'inline-block', 'padding': '2px 8px', 'white-space': 'nowrap'})
+          .html(label);
         $j('<td>').append($a).appendTo($tr).addClass('center');
       })();
 
