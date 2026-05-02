@@ -7,7 +7,6 @@ use App\Models\LegacyBenefit;
 use App\Models\LegacyDeficiency;
 use App\Models\LegacyProject;
 use App\Models\LegacyRace;
-use App\Models\LegacyRegistration;
 use App\Models\PersonHasPlace;
 use App\Models\Religion;
 use App\Models\TransportationProvider;
@@ -280,6 +279,13 @@ return new class extends clsDetalhe
 
         if ($registro['cod_aluno']) {
             $this->addDetalhe(detalhe: [_cl(key: 'aluno.detalhe.codigo_aluno'), $registro['cod_aluno']]);
+        }
+
+        if (class_exists(\Serventec\CatracaFrequencia\Support\StudentBiometricSection::class)) {
+            $htmlBiometrica = \Serventec\CatracaFrequencia\Support\StudentBiometricSection::render((int) $this->cod_aluno);
+            if ($htmlBiometrica !== '') {
+                $this->addDetalhe(detalhe: ['Biométrica', $htmlBiometrica]);
+            }
         }
 
         // código inep

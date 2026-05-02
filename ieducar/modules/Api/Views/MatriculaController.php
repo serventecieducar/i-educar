@@ -9,6 +9,7 @@ use iEducar\Modules\School\Model\ActiveLooking;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Serventec\CatracaFrequencia\Support\GideFacialHooks;
 
 class MatriculaController extends ApiCoreController
 {
@@ -740,6 +741,17 @@ class MatriculaController extends ApiCoreController
             $matricula->aprovado = $this->getRequest()->nova_situacao;
 
             if ($matricula->edita()) {
+                if (
+                    in_array((int) $situacaoNova, [
+                        App_Model_MatriculaSituacao::TRANSFERIDO,
+                        App_Model_MatriculaSituacao::ABANDONO,
+                        App_Model_MatriculaSituacao::FALECIDO,
+                    ], true)
+                    && class_exists(GideFacialHooks::class)
+                ) {
+                    GideFacialHooks::notifyExclusaoFacialAluno((int) $codAluno);
+                }
+
                 $this->alteraFalecimentoPessoa($codAluno);
 
                 return $this->messenger->append('Situação da matrícula alterada com sucesso.', 'success');

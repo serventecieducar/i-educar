@@ -18,6 +18,7 @@ use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
+use Serventec\CatracaFrequencia\Support\GideFacialHooks;
 
 return new class extends clsCadastro
 {
@@ -615,7 +616,7 @@ return new class extends clsCadastro
                 observacoes: $this->observacoes
             );
 
-            $dataMatriculaObj = new \DateTime(datetime: $this->data_matricula);
+            $dataMatriculaObj = new DateTime(datetime: $this->data_matricula);
             $dataTransferencia = $obj->pegaDataDeTransferencia(cod_aluno: $this->ref_cod_aluno, ano: $this->ano);
             $dataAnoLetivoInicio = $obj->pegaDataAnoLetivoInicio(cod_turma: $this->ref_cod_turma);
             $dataAnoLetivoTermino = $obj->pegaDataAnoLetivoFim(cod_turma: $this->ref_cod_turma);
@@ -941,6 +942,10 @@ return new class extends clsCadastro
         $excluiu = $obj->excluir();
 
         if ($excluiu) {
+            if (class_exists(GideFacialHooks::class)) {
+                GideFacialHooks::notifyExclusaoFacialSeSemMatriculaAtiva((int) $this->ref_cod_aluno);
+            }
+
             $enrollments = LegacyEnrollment::query()
                 ->where('ref_cod_matricula', $this->cod_matricula)
                 ->get();

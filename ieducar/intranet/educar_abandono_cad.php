@@ -4,6 +4,7 @@ use App\Models\LegacyAbandonmentType;
 use App\Models\LegacyActiveLooking;
 use Carbon\Carbon;
 use iEducar\Modules\School\Model\ActiveLooking;
+use Serventec\CatracaFrequencia\Support\GideFacialHooks;
 
 return new class extends clsCadastro
 {
@@ -204,6 +205,11 @@ return new class extends clsCadastro
                     ]);
 
                 $this->mensagem = 'Situação deixou de frequentar cadastrada com sucesso.<br>';
+
+                if (class_exists(GideFacialHooks::class)) {
+                    GideFacialHooks::notifyExclusaoFacialAluno((int) $this->ref_cod_aluno);
+                }
+
                 $this->simpleRedirect(url: "educar_matricula_det.php?cod_matricula={$this->ref_cod_matricula}");
             }
 

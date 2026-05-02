@@ -9,6 +9,7 @@ use App\Models\LegacyUser;
 use App\Services\PromotionService;
 use iEducar\Modules\School\Model\ActiveLooking;
 use Illuminate\Support\Facades\DB;
+use Serventec\CatracaFrequencia\Support\GideFacialHooks;
 
 return new class extends clsCadastro
 {
@@ -218,6 +219,8 @@ return new class extends clsCadastro
         $det_matricula = $obj_matricula->detalhe();
         $aprovado = $det_matricula['aprovado'];
 
+        $notificarGideFacialTransferencia = false;
+
         if ($aprovado == 3) {
             $obj = new clsPmieducarMatricula(
                 cod_matricula: $this->ref_cod_matricula,
@@ -258,6 +261,8 @@ return new class extends clsCadastro
                     }
                 }
             }
+
+            $notificarGideFacialTransferencia = true;
         }
         clsPmieducarHistoricoEscolar::gerarHistoricoTransferencia(ref_cod_matricula: $this->ref_cod_matricula, pessoa_logada: $this->pessoa_logada);
 
@@ -297,7 +302,7 @@ return new class extends clsCadastro
                 try {
                     (new Avaliacao_Model_NotaComponenteMediaDataMapper)
                         ->updateSituation(notaAlunoId: $notaAlunoId, situacao: App_Model_MatriculaSituacao::TRANSFERIDO);
-                } catch (\Throwable) {
+                } catch (Throwable) {
                     DB::rollback();
                 }
             }
@@ -311,6 +316,13 @@ return new class extends clsCadastro
                 ]);
 
             DB::commit();
+
+            if (
+                $notificarGideFacialTransferencia
+                && class_exists(GideFacialHooks::class)
+            ) {
+                GideFacialHooks::notifyExclusaoFacialAluno((int) $this->ref_cod_aluno);
+            }
 
             event(new TransferEvent(transfer: LegacyTransferRequest::findOrFail(id: $cadastrou)));
 

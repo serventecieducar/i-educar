@@ -1,5 +1,7 @@
 <?php
 
+use Serventec\CatracaFrequencia\Support\GideFacialHooks;
+
 return new class extends clsCadastro
 {
     public $pessoa_logada;
@@ -76,7 +78,7 @@ return new class extends clsCadastro
             ref_usuario_exc: $this->pessoa_logada,
             ref_usuario_cad: null,
             ref_cod_aluno: null,
-            aprovado: 6
+            aprovado: App_Model_MatriculaSituacao::FALECIDO
         );
         $obj_matricula->data_cancel = Portabilis_Date_Utils::brToPgSQL($this->data_cancel);
 
@@ -122,6 +124,11 @@ return new class extends clsCadastro
                 }
 
                 $this->mensagem .= 'Alteração realizado com sucesso.<br>';
+
+                if (class_exists(GideFacialHooks::class)) {
+                    GideFacialHooks::notifyExclusaoFacialAluno((int) $this->ref_cod_aluno);
+                }
+
                 $this->simpleRedirect("educar_matricula_det.php?cod_matricula={$this->ref_cod_matricula}");
             }
 
