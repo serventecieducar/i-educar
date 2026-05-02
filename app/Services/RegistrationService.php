@@ -13,6 +13,7 @@ use Avaliacao_Model_NotaComponenteMediaDataMapper;
 use DateTime;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Serventec\CatracaFrequencia\Support\GideFacialHooks;
 
 class RegistrationService
 {
@@ -87,6 +88,17 @@ class RegistrationService
         $registration->save();
 
         $this->checkUpdatedStatusAction($data, $registration);
+
+        if (
+            in_array((int) $data['nova_situacao'], [
+                App_Model_MatriculaSituacao::TRANSFERIDO,
+                App_Model_MatriculaSituacao::ABANDONO,
+                App_Model_MatriculaSituacao::FALECIDO,
+            ], true)
+            && class_exists(GideFacialHooks::class)
+        ) {
+            GideFacialHooks::notifyExclusaoFacialAluno((int) $registration->ref_cod_aluno);
+        }
     }
 
     /**
