@@ -9,8 +9,6 @@ class ReligiaoSeeder extends Seeder
 {
     public function run(): void
     {
-        Religion::withTrashed()->forceDelete();
-
         $religioes = [
             'Católica Apostólica Romana',
             'Evangélica',
@@ -24,7 +22,11 @@ class ReligiaoSeeder extends Seeder
         ];
 
         foreach ($religioes as $nome) {
-            Religion::create(['name' => $nome]);
+            /** @var Religion $religiao */
+            $religiao = Religion::withTrashed()->firstOrCreate(['name' => $nome], ['name' => $nome]);
+            if ($religiao->trashed()) {
+                $religiao->restore();
+            }
         }
     }
 }
