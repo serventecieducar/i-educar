@@ -10,6 +10,7 @@ use App\Models\LegacySchoolAcademicYear;
 use App\Models\LegacyStageType;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Gera o calendário escolar (dias letivos e módulos/etapas) para o ano anterior e
@@ -18,32 +19,119 @@ use Illuminate\Database\Seeder;
  * Cria o registro de calendário anual (pmieducar.calendario_ano_letivo), os dias
  * letivos (segunda a sexta, excluindo fins de semana, até 200 dias) e vincula os
  * módulos (trimestres/bimestres) ao ano letivo de cada escola.
+ *
+ * Suporta retomada: escolas que já possuem calendário anual com dias letivos e
+ * módulos vinculados para o ano corrente são puladas automaticamente.
+ * Para retomar de uma escola específica, defina `CALENDARIO_SEEDER_FROM_ESCOLA=<cod_escola>`.
  */
 class CalendarioEscolarSeeder extends Seeder
 {
     private const USUARIO_CAD = 1;
 
+    private function step(string $message): void
+    {
+        $line = '[CalendarioEscolarSeeder] ' . $message;
+        Log::info($line);
+        $this->command?->info($line);
+    }
+
     /**
      * Para cada escola, cria calendário anual e módulos dos anos anterior e atual.
+     * Pula escolas já configuradas para acelerar re-execuções.
      */
     public function run(): void
     {
+        $tInicio = microtime(true);
         $anoAnterior = Carbon::now()->year - 1;
         $anoAtual = Carbon::now()->year;
 
-        $schools = LegacySchool::all();
+        $fromEscola = $this->resolveFromEscola();
+
+        $query = LegacySchool::query()->orderBy('cod_escola');
+        if ($fromEscola !== null) {
+            $query->where('cod_escola', '>=', $fromEscola);
+        }
+
+        $schools = $query->get();
 
         if ($schools->isEmpty()) {
             $this->command?->warn('Nenhuma escola encontrada para criar calendário.');
+
             return;
         }
 
+        $totalEscolas = $schools->count();
+        $this->step(sprintf(
+            'Início (anos %d e %d, %d escolas%s).',
+            $anoAnterior,
+            $anoAtual,
+            $totalEscolas,
+            $fromEscola !== null ? ", a partir da escola {$fromEscola}" : ''
+        ));
+
+        $puladas = 0;
         foreach ($schools as $school) {
+            if ($this->escolaJaTemCalendario($school, $anoAtual)) {
+                $puladas++;
+
+                continue;
+            }
+
             foreach ([$anoAnterior, $anoAtual] as $ano) {
                 $this->criarCalendarioAnual($school, $ano);
                 $this->criarAnoLetivoModulos($school, $ano);
             }
         }
+
+        if ($puladas > 0) {
+            $this->step(sprintf('%d escola(s) já com calendário completo foram puladas.', $puladas));
+        }
+        $this->step(sprintf('Finalizado em %.2fs (%d processadas, %d puladas).', microtime(true) - $tInicio, $totalEscolas - $puladas, $puladas));
+    }
+
+    private function resolveFromEscola(): ?int
+    {
+        $val = env('CALENDARIO_SEEDER_FROM_ESCOLA');
+        if ($val === null || $val === '' || $val === false) {
+            return null;
+        }
+
+        $id = (int) $val;
+        $this->step("Variável CALENDARIO_SEEDER_FROM_ESCOLA={$id} detectada — escolas anteriores serão ignoradas.");
+
+        return $id;
+    }
+
+    /**
+     * Escola já possui calendário anual com dias letivos e módulos vinculados
+     * para o ano corrente — pode ser pulada com segurança.
+     */
+    private function escolaJaTemCalendario(LegacySchool $school, int $anoAtual): bool
+    {
+        $calendario = LegacyCalendarYear::query()
+            ->where('ref_cod_escola', $school->cod_escola)
+            ->where('ano', $anoAtual)
+            ->where('ativo', 1)
+            ->first();
+
+        if ($calendario === null) {
+            return false;
+        }
+
+        $temDias = LegacyCalendarDay::query()
+            ->where('ref_cod_calendario_ano_letivo', $calendario->cod_calendario_ano_letivo)
+            ->exists();
+
+        if (!$temDias) {
+            return false;
+        }
+
+        $temModulos = LegacyAcademicYearStage::query()
+            ->where('ref_ref_cod_escola', $school->cod_escola)
+            ->where('ref_ano', $anoAtual)
+            ->exists();
+
+        return $temModulos;
     }
 
     /**
