@@ -14,24 +14,54 @@ use App\Models\LegacySchoolClass;
 use App\Models\LegacySchoolClassType;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Seed padrão: cria/garante o curso de Atendimento Educacional Especializado (AEE)
  * e gera, no ano corrente, uma turma Matutino e uma turma Vespertino (40 vagas)
  * em todas as escolas ativas da rede.
+ *
+ * Suporta retomada: escolas que já possuem ambas as turmas AEE no ano corrente
+ * são puladas automaticamente. Para retomar de uma escola específica, defina
+ * `AEE_SEEDER_FROM_ESCOLA=<cod_escola>`.
  */
 class AeeSeeder extends Seeder
 {
     private const USUARIO_CAD = 1;
 
+    private const TURMAS_AEE_POR_ESCOLA = 2;
+
+    private function step(string $message): void
+    {
+        $line = '[AeeSeeder] ' . $message;
+        Log::info($line);
+        $this->command?->info($line);
+    }
+
     public function run(): void
     {
+        $tInicio = microtime(true);
         $ano = now()->year;
 
-        $schools = LegacySchool::query()->where('ativo', 1)->get();
+        $fromEscola = $this->resolveFromEscola();
+
+        $query = LegacySchool::query()->where('ativo', 1)->orderBy('cod_escola');
+        if ($fromEscola !== null) {
+            $query->where('cod_escola', '>=', $fromEscola);
+        }
+
+        $schools = $query->get();
         if ($schools->isEmpty()) {
             return;
         }
+
+        $totalEscolas = $schools->count();
+        $this->step(sprintf(
+            'Início (ano %d, %d escolas%s).',
+            $ano,
+            $totalEscolas,
+            $fromEscola !== null ? ", a partir da escola {$fromEscola}" : ''
+        ));
 
         $instituicoes = $schools->pluck('ref_cod_instituicao')->unique()->filter()->values();
 
@@ -39,8 +69,17 @@ class AeeSeeder extends Seeder
             $this->garantirAeeCursoESerie((int) $instituicaoId);
         }
 
+        $indice = 0;
+        $puladas = 0;
         foreach ($schools as $school) {
+            $indice++;
             $instituicaoId = (int) $school->ref_cod_instituicao;
+
+            if ($this->escolaJaTemAee($school->cod_escola, $instituicaoId, $ano)) {
+                $puladas++;
+
+                continue;
+            }
 
             $cursoAee = LegacyCourse::query()
                 ->where('ref_cod_instituicao', $instituicaoId)
@@ -60,7 +99,6 @@ class AeeSeeder extends Seeder
                 continue;
             }
 
-            // Garante ano letivo corrente para a escola (para permitir uso no sistema).
             LegacySchoolAcademicYear::firstOrCreate(
                 [
                     'ref_cod_escola' => $school->cod_escola,
@@ -113,6 +151,48 @@ class AeeSeeder extends Seeder
             $this->garantirTurmaAee($school->cod_escola, $instituicaoId, $cursoAee->cod_curso, $serieAee->cod_serie, $ano, $turmaTipo->cod_turma_tipo, 1, 'AEE - Matutino');
             $this->garantirTurmaAee($school->cod_escola, $instituicaoId, $cursoAee->cod_curso, $serieAee->cod_serie, $ano, $turmaTipo->cod_turma_tipo, 2, 'AEE - Vespertino');
         }
+
+        if ($puladas > 0) {
+            $this->step(sprintf('%d escola(s) já com AEE completo foram puladas.', $puladas));
+        }
+        $this->step(sprintf('Finalizado em %.2fs (%d processadas, %d puladas).', microtime(true) - $tInicio, $totalEscolas - $puladas, $puladas));
+    }
+
+    private function resolveFromEscola(): ?int
+    {
+        $val = env('AEE_SEEDER_FROM_ESCOLA');
+        if ($val === null || $val === '' || $val === false) {
+            return null;
+        }
+
+        $id = (int) $val;
+        $this->step("Variável AEE_SEEDER_FROM_ESCOLA={$id} detectada — escolas anteriores serão ignoradas.");
+
+        return $id;
+    }
+
+    /**
+     * Escola já possui as 2 turmas AEE (Matutino + Vespertino) ativas no ano corrente.
+     */
+    private function escolaJaTemAee(int $codEscola, int $instituicaoId, int $ano): bool
+    {
+        $cursoAee = LegacyCourse::query()
+            ->where('ref_cod_instituicao', $instituicaoId)
+            ->where('nm_curso', 'Atendimento Educacional Especializado - AEE')
+            ->first();
+
+        if ($cursoAee === null) {
+            return false;
+        }
+
+        $turmasAee = LegacySchoolClass::query()
+            ->where('ref_ref_cod_escola', $codEscola)
+            ->where('ref_cod_curso', $cursoAee->cod_curso)
+            ->where('ano', $ano)
+            ->where('ativo', 1)
+            ->count();
+
+        return $turmasAee >= self::TURMAS_AEE_POR_ESCOLA;
     }
 
     private function garantirAeeCursoESerie(int $instituicaoId): void
