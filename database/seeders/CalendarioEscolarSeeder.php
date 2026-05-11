@@ -11,10 +11,21 @@ use App\Models\LegacyStageType;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 
+/**
+ * Gera o calendário escolar (dias letivos e módulos/etapas) para o ano anterior e
+ * o ano corrente em todas as escolas cadastradas.
+ *
+ * Cria o registro de calendário anual (pmieducar.calendario_ano_letivo), os dias
+ * letivos (segunda a sexta, excluindo fins de semana, até 200 dias) e vincula os
+ * módulos (trimestres/bimestres) ao ano letivo de cada escola.
+ */
 class CalendarioEscolarSeeder extends Seeder
 {
     private const USUARIO_CAD = 1;
 
+    /**
+     * Para cada escola, cria calendário anual e módulos dos anos anterior e atual.
+     */
     public function run(): void
     {
         $anoAnterior = Carbon::now()->year - 1;
@@ -35,6 +46,10 @@ class CalendarioEscolarSeeder extends Seeder
         }
     }
 
+    /**
+     * Vincula o tipo de etapa (trimestre/bimestre) ao ano letivo da escola,
+     * distribuindo as datas de início/fim proporcionalmente no período fev–dez.
+     */
     private function criarAnoLetivoModulos(LegacySchool $school, int $ano): void
     {
         $schoolAcademicYear = LegacySchoolAcademicYear::query()
@@ -100,6 +115,9 @@ class CalendarioEscolarSeeder extends Seeder
         return $result;
     }
 
+    /**
+     * Cria o registro de calendário anual da escola e gera os dias letivos do período.
+     */
     private function criarCalendarioAnual(LegacySchool $school, int $ano): void
     {
         $calendario = LegacyCalendarYear::firstOrCreate(
@@ -117,6 +135,10 @@ class CalendarioEscolarSeeder extends Seeder
         $this->gerarDiasLetivos($calendario, $ano);
     }
 
+    /**
+     * Insere até 200 dias letivos (seg–sex) no período de fevereiro a dezembro,
+     * pulando registros já existentes para idempotência.
+     */
     private function gerarDiasLetivos(LegacyCalendarYear $calendario, int $ano): void
     {
         $inicio = Carbon::create($ano, 2, 1);

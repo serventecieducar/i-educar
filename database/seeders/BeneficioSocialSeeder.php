@@ -71,6 +71,10 @@ class BeneficioSocialSeeder extends Seeder
         ],
     ];
 
+    /**
+     * Cria benefícios novos e atualiza descrição/ativação dos existentes.
+     * Idempotente: busca por nome para evitar duplicatas.
+     */
     public function run(): void
     {
         $totalCriados = 0;

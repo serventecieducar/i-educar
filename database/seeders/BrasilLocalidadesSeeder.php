@@ -15,6 +15,10 @@ class BrasilLocalidadesSeeder extends Seeder
 {
     use IncrementSequence;
 
+    /**
+     * Executa seeders de localidades na ordem país → estados → municípios → distritos
+     * e ajusta as sequences do PostgreSQL para evitar conflito de ID em inserções futuras.
+     */
     public function run(): void
     {
         $this->call(CountriesTableSeeder::class);

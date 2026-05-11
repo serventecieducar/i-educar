@@ -6,6 +6,13 @@ use App\Models\LegacyInstitution;
 use App\Models\LegacyTransferType;
 use Illuminate\Database\Seeder;
 
+/**
+ * Cadastra os motivos padrão de transferência escolar em todas as instituições.
+ *
+ * Motivos: mudança de endereço, mudança de escola na mesma rede, mudança de
+ * curso/etapa, encerramento de turma, solicitação da família e motivo disciplinar.
+ * Idempotente via firstOrCreate por nome + instituição.
+ */
 class TransferenciaTipoSeeder extends Seeder
 {
     private const USUARIO_CAD = 1;
@@ -45,6 +52,9 @@ class TransferenciaTipoSeeder extends Seeder
         ];
     }
 
+    /**
+     * Cria os motivos de transferência padrão para cada instituição cadastrada.
+     */
     public function run(): void
     {
         $instituicoes = LegacyInstitution::all();

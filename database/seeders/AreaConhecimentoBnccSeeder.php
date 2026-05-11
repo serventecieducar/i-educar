@@ -42,6 +42,10 @@ class AreaConhecimentoBnccSeeder extends Seeder
         ],
     ];
 
+    /**
+     * Cria/atualiza as áreas de conhecimento BNCC em todas as instituições ativas.
+     * Usa firstOrCreate para idempotência.
+     */
     public function run(): void
     {
         $instituicoes = LegacyInstitution::query()

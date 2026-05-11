@@ -16,6 +16,10 @@ class EncerrarAnosAnterioresSeeder extends Seeder
 {
     private const USUARIO_SISTEMA = 1;
 
+    /**
+     * Finaliza todos os anos letivos anteriores ao corrente e desabilita
+     * matrícula fora do período letivo na instituição.
+     */
     public function run(): void
     {
         $anoCorrente = (int) now()->year;

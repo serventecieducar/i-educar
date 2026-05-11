@@ -7,6 +7,13 @@ use App\Models\LegacySchoolAcademicYear;
 use App_Model_MatriculaSituacao;
 use Illuminate\Database\Seeder;
 
+/**
+ * Encerra o ano letivo de 2024: aprova matrículas pendentes (em andamento ou em exame)
+ * e finaliza os registros de ano letivo das escolas.
+ *
+ * Garante que nenhum aluno fique com situação aberta no ano anterior ao iniciar
+ * o setup do ano corrente.
+ */
 class EncerrarAno2024Seeder extends Seeder
 {
     private const ANO_ENCERRAMENTO = 2024;
@@ -19,6 +26,9 @@ class EncerrarAno2024Seeder extends Seeder
         App_Model_MatriculaSituacao::EM_EXAME,        // 7 - Em exame
     ];
 
+    /**
+     * Aprova matrículas pendentes de 2024 e encerra os anos letivos daquele ano.
+     */
     public function run(): void
     {
         $matriculasAprovadas = $this->aprovarMatriculasPendentes();
