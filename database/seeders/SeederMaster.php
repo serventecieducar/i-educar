@@ -19,25 +19,25 @@ class SeederMaster extends Seeder
     public function run(): void
     {
         // 1. Localidades: país Brasil, estados, municípios e distritos (IBGE/Censo).
-        //$this->call(BrasilLocalidadesSeeder::class);
+        $this->call(BrasilLocalidadesSeeder::class);
 
         // 2. Encerra o ano letivo de 2024: aprova matrículas pendentes (cursando/em exame)
         //    e finaliza os anos letivos das escolas.
-        //$this->call(EncerrarAno2024Seeder::class);
+        $this->call(EncerrarAno2024Seeder::class);
 
         // 3. Encerra todos os anos letivos anteriores ao corrente, impedindo
         //    matrículas/enturmações em anos passados.
-        //$this->call(EncerrarAnosAnterioresSeeder::class);
+        $this->call(EncerrarAnosAnterioresSeeder::class);
 
         // 4. Áreas de conhecimento e componentes curriculares conforme a BNCC
         //    (Ed. Infantil, Fundamental, Médio). Base para o vínculo série→disciplina.
-        //$this->call(AreaConhecimentoBnccSeeder::class);
+        $this->call(AreaConhecimentoBnccSeeder::class);
 
         // 5. Configuração escolar: anos letivos, cursos BNCC, séries, vínculos
         //    escola↔curso↔série↔disciplina, sequências de enturmação e bloqueio
         //    de matrícula em série não sequente. Suporta retomada via
         //    CONFIGURACAO_ESCOLAR_FROM_ESCOLA e detecção de escolas já configuradas.
-        //$this->call(ConfiguracaoEscolarSeeder::class);
+        $this->call(ConfiguracaoEscolarSeeder::class);
         
         // 6. Atendimento Educacional Especializado: curso AEE, série única e
         //    turmas Matutino/Vespertino (40 vagas) em todas as escolas ativas.
