@@ -86,10 +86,14 @@ class ConfiguracaoEscolarSeeder extends Seeder
         [$anoAnterior, $anoAtual] = $this->obterAnosLetivos();
         $anos = [$anoAnterior, $anoAtual];
 
-        // Apenas colunas usadas no loop — reduz memória com muitas escolas.
-        $schools = LegacySchool::query()
-            ->orderBy('cod_escola')
-            ->get(['cod_escola', 'ref_cod_instituicao']);
+        $fromEscola = $this->resolveFromEscola();
+
+        $query = LegacySchool::query()->orderBy('cod_escola');
+        if ($fromEscola !== null) {
+            $query->where('cod_escola', '>=', $fromEscola);
+        }
+
+        $schools = $query->get(['cod_escola', 'ref_cod_instituicao']);
 
         if ($schools->isEmpty()) {
             $this->command?->warn('Nenhuma escola encontrada. Execute o setup em um ambiente com escolas cadastradas.');
@@ -99,17 +103,34 @@ class ConfiguracaoEscolarSeeder extends Seeder
 
         $totalEscolas = $schools->count();
         $this->step(sprintf(
-            'Início (anos %d e %d, %d escolas). Trace detalhado: CONFIGURACAO_ESCOLAR_SEEDER_TRACE=true ou `php artisan db:seed ... -v`.',
+            'Início (anos %d e %d, %d escolas%s). Trace detalhado: CONFIGURACAO_ESCOLAR_SEEDER_TRACE=true ou `php artisan db:seed ... -v`.',
             $anoAnterior,
             $anoAtual,
-            $totalEscolas
+            $totalEscolas,
+            $fromEscola !== null ? ", a partir da escola {$fromEscola}" : ''
         ));
 
+        $cursosEsperados = count($this->definicaoCursosBnccEtapas());
         $indice = 0;
+        $puladas = 0;
         foreach ($schools as $school) {
             /** @var LegacySchool $school */
             $indice++;
             $instituicaoId = $school->ref_cod_instituicao;
+
+            if ($this->escolaJaConfigurada($school, $anoAtual, $cursosEsperados)) {
+                $puladas++;
+                $this->trace(sprintf(
+                    'Escola %d/%d cod_escola=%s — já configurada para %d, pulando.',
+                    $indice,
+                    $totalEscolas,
+                    $school->cod_escola,
+                    $anoAtual
+                ));
+
+                continue;
+            }
+
             $this->trace(sprintf(
                 'Escola %d/%d cod_escola=%s instituicao=%s — criar anos + cursos/vínculos',
                 $indice,
@@ -119,12 +140,12 @@ class ConfiguracaoEscolarSeeder extends Seeder
             ));
 
             $this->criarAnosLetivos($school, $anos);
-            // Apenas garante cursos/séries/vínculos/disciplina por escola.
-            // A geração de turmas (pmieducar.turma) foi movida para um passo opcional
-            // executado via comando específico antes do período de matrículas.
             $this->criarCursosEVinculosSemTurmas($school, $instituicaoId, $anos);
         }
 
+        if ($puladas > 0) {
+            $this->step(sprintf('%d escola(s) já configurada(s) foram puladas.', $puladas));
+        }
         $this->step(sprintf('Loop por escola concluído em %.2fs.', microtime(true) - $tInicio));
 
         $instituicoes = $schools->pluck('ref_cod_instituicao')->unique()->filter()->values();
@@ -143,6 +164,57 @@ class ConfiguracaoEscolarSeeder extends Seeder
         $this->habilitarBloqueioMatriculaSerieNaoSeguinte($instituicoes->all());
 
         $this->step(sprintf('Finalizado em %.2fs.', microtime(true) - $tInicio));
+    }
+
+    /**
+     * Env `CONFIGURACAO_ESCOLAR_FROM_ESCOLA=123` permite retomar a partir de uma escola específica.
+     * Útil quando o seed falhou no meio de centenas de escolas.
+     */
+    private function resolveFromEscola(): ?int
+    {
+        $val = env('CONFIGURACAO_ESCOLAR_FROM_ESCOLA');
+        if ($val === null || $val === '' || $val === false) {
+            return null;
+        }
+
+        $id = (int) $val;
+        $this->step("Variável CONFIGURACAO_ESCOLAR_FROM_ESCOLA={$id} detectada — escolas anteriores serão ignoradas.");
+
+        return $id;
+    }
+
+    /**
+     * Verifica rapidamente se a escola já possui anos letivos e vínculos de curso
+     * para o ano corrente, indicando que a configuração completa já foi feita.
+     * Isso permite pular re-processamento em execuções subsequentes.
+     */
+    private function escolaJaConfigurada(LegacySchool $school, int $anoAtual, int $cursosEsperados): bool
+    {
+        $temAnoLetivo = LegacySchoolAcademicYear::query()
+            ->where('ref_cod_escola', $school->cod_escola)
+            ->where('ano', $anoAtual)
+            ->where('ativo', 1)
+            ->exists();
+
+        if (!$temAnoLetivo) {
+            return false;
+        }
+
+        $qtdCursosVinculados = LegacySchoolCourse::query()
+            ->where('ref_cod_escola', $school->cod_escola)
+            ->where('ativo', 1)
+            ->count();
+
+        if ($qtdCursosVinculados < $cursosEsperados) {
+            return false;
+        }
+
+        $qtdSeriesVinculadas = LegacySchoolGrade::query()
+            ->where('ref_cod_escola', $school->cod_escola)
+            ->where('ativo', 1)
+            ->count();
+
+        return $qtdSeriesVinculadas > 0;
     }
 
     /**
