@@ -5,7 +5,6 @@ namespace Database\Seeders;
 use App\Models\LegacyCourse;
 use App\Models\LegacyDiscipline;
 use App\Models\LegacyDisciplineAcademicYear;
-use App\Models\LegacyDisciplineSchoolClass;
 use App\Models\LegacyEducationLevel;
 use App\Models\LegacyEducationType;
 use App\Models\LegacyEvaluationRule;
@@ -16,7 +15,6 @@ use App\Models\LegacyPeriod;
 use App\Models\LegacyRegimeType;
 use App\Models\LegacySchool;
 use App\Models\LegacySchoolAcademicYear;
-use App\Models\LegacySchoolClass;
 use App\Models\LegacySchoolClassType;
 use App\Models\LegacySchoolCourse;
 use App\Models\LegacySchoolGrade;
@@ -66,6 +64,20 @@ class ConfiguracaoEscolarSeeder extends Seeder
         $this->command?->line($line);
     }
 
+    /**
+     * Progresso por iteração em loops (consola + log), para acompanhar cada etapa e o estado.
+     *
+     * @param  string  $contexto  Onde está (ex.: escola, curso, série)
+     * @param  string  $status    Estado curto: EM CURSO, OK, PULADA, AVISO, IGNORADA
+     * @param  string  $acao      O que está a ser feito neste passo
+     */
+    private function relatorioEtapa(string $contexto, string $status, string $acao): void
+    {
+        $line = sprintf('[ConfiguracaoEscolarSeeder] %s | [%s] %s', $contexto, $status, $acao);
+        Log::info($line);
+        $this->command?->line($line);
+    }
+
     /** @return array{0: int, 1: int} Ano anterior e ano atual */
     private function obterAnosLetivos(): array
     {
@@ -103,7 +115,7 @@ class ConfiguracaoEscolarSeeder extends Seeder
 
         $totalEscolas = $schools->count();
         $this->step(sprintf(
-            'Início (anos %d e %d, %d escolas%s). Trace detalhado: CONFIGURACAO_ESCOLAR_SEEDER_TRACE=true ou `php artisan db:seed ... -v`.',
+            'Início (anos %d e %d, %d escolas%s). Cada escola/curso/etapa e pós-processamento por instituição são listados abaixo. Trace extra: CONFIGURACAO_ESCOLAR_SEEDER_TRACE=true ou `php artisan db:seed ... -v`.',
             $anoAnterior,
             $anoAtual,
             $totalEscolas,
@@ -120,6 +132,11 @@ class ConfiguracaoEscolarSeeder extends Seeder
 
             if ($this->escolaJaConfigurada($school, $anoAtual, $cursosEsperados)) {
                 $puladas++;
+                $this->relatorioEtapa(
+                    sprintf('Escola %d/%d | cod_escola=%s', $indice, $totalEscolas, $school->cod_escola),
+                    'PULADA',
+                    sprintf('Já configurada para o ano %d (anos letivos + vínculos BNCC); sem alterações.', $anoAtual)
+                );
                 $this->trace(sprintf(
                     'Escola %d/%d cod_escola=%s — já configurada para %d, pulando.',
                     $indice,
@@ -131,6 +148,11 @@ class ConfiguracaoEscolarSeeder extends Seeder
                 continue;
             }
 
+            $this->relatorioEtapa(
+                sprintf('Escola %d/%d | cod_escola=%s | instituicao=%s', $indice, $totalEscolas, $school->cod_escola, $instituicaoId ?? 'null'),
+                'EM CURSO',
+                'Criar anos letivos, cursos BNCC, séries, regras por ano, vínculos escola-curso-série e disciplinas (sem turmas).'
+            );
             $this->trace(sprintf(
                 'Escola %d/%d cod_escola=%s instituicao=%s — criar anos + cursos/vínculos',
                 $indice,
@@ -141,6 +163,11 @@ class ConfiguracaoEscolarSeeder extends Seeder
 
             $this->criarAnosLetivos($school, $anos);
             $this->criarCursosEVinculosSemTurmas($school, $instituicaoId, $anos);
+            $this->relatorioEtapa(
+                sprintf('Escola %d/%d | cod_escola=%s', $indice, $totalEscolas, $school->cod_escola),
+                'OK',
+                'Ciclo desta escola concluído (anos + cursos/etapas/disciplinas).'
+            );
         }
 
         if ($puladas > 0) {
@@ -151,10 +178,31 @@ class ConfiguracaoEscolarSeeder extends Seeder
         $instituicoes = $schools->pluck('ref_cod_instituicao')->unique()->filter()->values();
         $tInst = microtime(true);
         foreach ($instituicoes as $instituicaoId) {
+            $this->relatorioEtapa(
+                sprintf('Instituição cod_instituicao=%s', $instituicaoId),
+                'EM CURSO',
+                'Garantir sequências de série → série (BNCC) para validação de matrícula em série seguinte.'
+            );
             $this->trace('Instituição '.$instituicaoId.' — sequências BNCC (enturmação)');
             $this->garantirSequenciasEnturmacaoBncc((int) $instituicaoId);
+            $this->relatorioEtapa(
+                sprintf('Instituição cod_instituicao=%s', $instituicaoId),
+                'OK',
+                'Sequências BNCC (serie_origem → serie_destino) atualizadas.'
+            );
+
+            $this->relatorioEtapa(
+                sprintf('Instituição cod_instituicao=%s', $instituicaoId),
+                'EM CURSO',
+                'Sincronizar pmieducar.escola_serie_disciplina para todas as escolas/séries/componentes da instituição.'
+            );
             $this->trace('Instituição '.$instituicaoId.' — sincronizar escola_serie_disciplina');
             $this->garantirEscolaSerieDisciplinasInstituicao((int) $instituicaoId, $anos);
+            $this->relatorioEtapa(
+                sprintf('Instituição cod_instituicao=%s', $instituicaoId),
+                'OK',
+                'Sincronização escola_serie_disciplina concluída para esta instituição.'
+            );
         }
         $this->step(sprintf(
             'Pós-processamento por instituição concluído em %.2fs.',
@@ -247,12 +295,24 @@ class ConfiguracaoEscolarSeeder extends Seeder
     private function garantirSequenciasEnturmacaoBncc(int $instituicaoId): void
     {
         foreach ($this->definicaoCursosBnccEtapas() as $nomeCurso => $meta) {
+            $this->relatorioEtapa(
+                sprintf('Instituição %d | Curso «%s» | Sequências enturmação', $instituicaoId, $nomeCurso),
+                'EM CURSO',
+                'Localizar curso e séries BNCC; criar/atualizar pmieducar.sequencia_serie_origem_destino (origem→destino).'
+            );
+
             $curso = LegacyCourse::query()
                 ->where('ref_cod_instituicao', $instituicaoId)
                 ->where('nm_curso', $nomeCurso)
                 ->first();
 
             if ($curso === null) {
+                $this->relatorioEtapa(
+                    sprintf('Instituição %d | Curso «%s» | Sequências enturmação', $instituicaoId, $nomeCurso),
+                    'IGNORADA',
+                    'Curso não encontrado nesta instituição; sem sequências a gerar.'
+                );
+
                 continue;
             }
 
@@ -267,6 +327,7 @@ class ConfiguracaoEscolarSeeder extends Seeder
                 }
             }
 
+            $pares = 0;
             for ($i = 0, $n = count($serieIds); $i < $n - 1; $i++) {
                 LegacySequenceGrade::query()->updateOrCreate(
                     [
@@ -279,7 +340,21 @@ class ConfiguracaoEscolarSeeder extends Seeder
                         'data_cadastro' => now(),
                     ]
                 );
+                $pares++;
+                $this->trace(sprintf(
+                    'Instituição %d | %s | Ligação série %d → série %d',
+                    $instituicaoId,
+                    $nomeCurso,
+                    $serieIds[$i],
+                    $serieIds[$i + 1]
+                ));
             }
+
+            $this->relatorioEtapa(
+                sprintf('Instituição %d | Curso «%s» | Sequências enturmação', $instituicaoId, $nomeCurso),
+                'OK',
+                sprintf('%d ligação(ões) série→série garantida(s) (%d séries encontradas).', $pares, count($serieIds))
+            );
         }
     }
 
@@ -302,7 +377,13 @@ class ConfiguracaoEscolarSeeder extends Seeder
     private function criarAnosLetivos(LegacySchool $school, array $anos): void
     {
         foreach ($anos as $ano) {
-            LegacySchoolAcademicYear::firstOrCreate(
+            $this->relatorioEtapa(
+                sprintf('Escola cod_escola=%s | Ano letivo %d', $school->cod_escola, $ano),
+                'EM CURSO',
+                'Garantir registo em escola_ano_letivo (firstOrCreate, andamento em curso, ativo).'
+            );
+
+            $anoLetivo = LegacySchoolAcademicYear::firstOrCreate(
                 [
                     'ref_cod_escola' => $school->cod_escola,
                     'ano' => $ano,
@@ -312,6 +393,14 @@ class ConfiguracaoEscolarSeeder extends Seeder
                     'andamento' => LegacySchoolAcademicYear::IN_PROGRESS,
                     'ativo' => 1,
                 ]
+            );
+
+            $this->relatorioEtapa(
+                sprintf('Escola cod_escola=%s | Ano letivo %d', $school->cod_escola, $ano),
+                'OK',
+                $anoLetivo->wasRecentlyCreated
+                    ? 'Ano letivo criado.'
+                    : 'Ano letivo já existia; registo mantido/confirmado.'
             );
         }
     }
@@ -415,6 +504,11 @@ class ConfiguracaoEscolarSeeder extends Seeder
             ->first();
 
         if (!$regraAvaliacao) {
+            $this->relatorioEtapa(
+                sprintf('Escola cod_escola=%s | Instituição %d', $school->cod_escola, $instituicaoId),
+                'AVISO',
+                'Sem regra de avaliação na instituição; cursos/séries/disciplinas não serão gerados. Cadastre em Cadastros > Regras de avaliação.'
+            );
             $this->command?->warn("Instituição {$instituicaoId} sem regra de avaliação. Configure em Cadastros > Regras de avaliação.");
 
             return;
@@ -435,6 +529,11 @@ class ConfiguracaoEscolarSeeder extends Seeder
         $turmaTurno = LegacyPeriod::query()->where('ativo', 1)->orderBy('id')->first();
 
         if (!$turmaTipo || !$turmaTurno) {
+            $this->relatorioEtapa(
+                sprintf('Escola cod_escola=%s | Instituição %d', $school->cod_escola, $instituicaoId),
+                'AVISO',
+                'Tipo ou turno de turma indisponível após garantia automática; não é possível preparar turmas (este seeder não cria turmas).'
+            );
             $this->command?->warn(
                 "Instituição {$instituicaoId}: tipo ou turno de turma indisponível após garantia automática; turmas não serão geradas."
             );
@@ -453,6 +552,16 @@ class ConfiguracaoEscolarSeeder extends Seeder
                 ->where('nm_curso', $nomeCurso)
                 ->first();
 
+            $cursoJaExistia = $curso !== null;
+
+            $this->relatorioEtapa(
+                sprintf('Escola cod_escola=%s | Inst %d | Curso «%s»', $school->cod_escola, $instituicaoId, $nomeCurso),
+                'EM CURSO',
+                $cursoJaExistia
+                    ? 'Curso já existente na instituição; vincular à escola e processar cada etapa (série) BNCC.'
+                    : 'Criar curso na instituição, vincular à escola e processar cada etapa (série) BNCC.'
+            );
+
             if (!$curso) {
                 $nivel = LegacyEducationLevel::query()
                     ->where('ref_cod_instituicao', $instituicaoId)
@@ -467,6 +576,11 @@ class ConfiguracaoEscolarSeeder extends Seeder
                     ->first();
 
                 if (!$nivel || !$tipo) {
+                    $this->relatorioEtapa(
+                        sprintf('Escola cod_escola=%s | Inst %d | Curso «%s»', $school->cod_escola, $instituicaoId, $nomeCurso),
+                        'AVISO',
+                        'Instituição sem nível ou tipo de ensino; não é possível criar o curso. Configure em Cadastros.'
+                    );
                     $this->command?->warn("Instituição {$instituicaoId} sem nível de ensino ou tipo de ensino. Configure em Cadastros.");
 
                     continue;
@@ -488,16 +602,37 @@ class ConfiguracaoEscolarSeeder extends Seeder
                     'data_cadastro' => now(),
                     'ativo' => 1,
                 ]);
+                $this->relatorioEtapa(
+                    sprintf('Escola cod_escola=%s | Inst %d | Curso «%s»', $school->cod_escola, $instituicaoId, $nomeCurso),
+                    'OK',
+                    sprintf('Curso criado (cod_curso=%d).', $curso->cod_curso)
+                );
             }
 
             $curso->update(['padrao_ano_escolar' => true]);
             $this->vincularCursoEscola($school, $curso, $anos);
 
+            $totalEtapasCurso = count($config['grades']);
             foreach ($config['grades'] as $etapa => $nmSerie) {
+                $this->relatorioEtapa(
+                    sprintf(
+                        'Escola cod_escola=%s | «%s» | Etapa %d/%d «%s»',
+                        $school->cod_escola,
+                        $nomeCurso,
+                        $etapa + 1,
+                        $totalEtapasCurso,
+                        $nmSerie
+                    ),
+                    'EM CURSO',
+                    'Garantir série (pmieducar.serie), regra por ano letivo, vínculo escola_serie e disciplinas BNCC (componente_curricular_ano_escolar + escola_serie_disciplina).'
+                );
+
                 $grade = LegacyGrade::query()
                     ->where('ref_cod_curso', $curso->cod_curso)
                     ->where('nm_serie', $nmSerie)
                     ->first();
+
+                $serieJaExistia = $grade !== null;
 
                 if (!$grade) {
                     $grade = LegacyGrade::create([
@@ -514,11 +649,43 @@ class ConfiguracaoEscolarSeeder extends Seeder
                 }
 
                 foreach ($anos as $ano) {
+                    $this->trace(sprintf(
+                        'Escola %s | série «%s» | Ano %d — vincular regra de avaliação à série.',
+                        $school->cod_escola,
+                        $nmSerie,
+                        $ano
+                    ));
                     $this->vincularRegraAvaliacaoSerie($grade, $regraAvaliacao, $ano);
                 }
                 $this->vincularSerieEscola($school, $grade, $anos);
                 $this->vincularDisciplinasSerie($school, $grade, $config['disciplinas'], $instituicaoId, $anos);
+
+                $qDisc = count($config['disciplinas']);
+                $this->relatorioEtapa(
+                    sprintf(
+                        'Escola cod_escola=%s | «%s» | Etapa %d/%d «%s»',
+                        $school->cod_escola,
+                        $nomeCurso,
+                        $etapa + 1,
+                        $totalEtapasCurso,
+                        $nmSerie
+                    ),
+                    'OK',
+                    sprintf(
+                        'cod_serie=%d; série %s; %d ano(s) com regra; %d disciplina(s) BNCC processadas.',
+                        $grade->cod_serie,
+                        $serieJaExistia ? 'já existia' : 'criada',
+                        count($anos),
+                        $qDisc
+                    )
+                );
             }
+
+            $this->relatorioEtapa(
+                sprintf('Escola cod_escola=%s | Inst %d | Curso «%s»', $school->cod_escola, $instituicaoId, $nomeCurso),
+                'OK',
+                'Curso e todas as etapas (séries) concluídos para esta escola.'
+            );
         }
     }
 
