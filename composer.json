@@ -66,6 +66,7 @@
     },
     "autoload": {
         "classmap": [
+            "src/Legacy/Portabilis/Model/Report/TipoBoletim.php",
             "ieducar/intranet/include",
             "ieducar/lib",
             "ieducar/modules/*/Model",

@@ -1,13 +1,20 @@
 <?php
 
 /**
- * Cópia alinhada ao `portabilis/i-educar-reports-package` (ieducar/Tipos/TipoBoletim.php).
+ * Enum legado de tipos de boletim (campos `tipo_boletim` / `tipo_boletim_diferenciado` em turmas).
  *
- * Mantida no core para ambientes em que o pacote de relatórios não está no `vendor/`
- * (ex.: deploy sem plug-and-play / `composer install` mínimo), evitando erro ao abrir
- * o cadastro de turma. Quando o pacote oficial estiver instalado, o Composer costuma
- * mapear apenas um caminho para esta classe; este ficheiro deve permanecer idêntico
- * ao do pacote para não divergir comportamento.
+ * Histórico: a implementação original vinha do pacote `portabilis/i-educar-reports-package`, hoje
+ * descontinuado em vários ambientes. O core mantém esta classe para:
+ * - cadastro de turma (`educar_turma_cad.php`);
+ * - API de turmas (`TurmaController`);
+ * - atualização em lote de modelo de boletim (`UpdateSchoolClassReportCardController`).
+ *
+ * Não depende de Jasper nem de ficheiros do pacote Portabilis: `getEnums()` alimenta apenas os
+ * selects; `getReports()` devolve chaves estáveis compatíveis com código legado (não garante
+ * geração de PDF sem um motor de relatórios à parte).
+ *
+ * Localização: `src/Legacy/...` — código de compatibilidade fora de `ieducar/lib`, com entrada
+ * explícita no `classmap` do `composer.json` para autoload fiável após `composer dump-autoload`.
  */
 class Portabilis_Model_Report_TipoBoletim extends CoreExt_Enum
 {
@@ -28,6 +35,7 @@ class Portabilis_Model_Report_TipoBoletim extends CoreExt_Enum
         self::PARECER_DESCRITIVO_GERAL => 'Parecer descritivo geral',
     ];
 
+    /** @var array<int, string> chaves estáveis (legado Jasper / API) */
     protected $_reports = [
         self::NUMERIC => 'report-card',
         self::CONCEPTUAL => 'conceptual-report-card',
