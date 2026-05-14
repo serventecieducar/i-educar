@@ -723,7 +723,7 @@ class AcademicYearService
             if ($this->isLeapYear($adjustedDate)) {
                 $adjustedDate = str_replace('-02-29', '-02-28', $adjustedDate);
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
         }
 
         return $adjustedDate;
@@ -735,7 +735,7 @@ class AcademicYearService
             $year = Carbon::createFromFormat('Y-m-d', $date)->year;
 
             return $year % 4 === 0 && ($year % 100 !== 0 || $year % 400 === 0);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return false;
         }
     }
@@ -915,6 +915,25 @@ class AcademicYearService
         int $schoolId,
         int $year
     ): void {
+        if ((int) $academicYear->ref_cod_escola !== $schoolId || (int) $academicYear->ano !== $year) {
+            throw new AcademicYearServiceException(
+                'Inconsistência entre o registo de ano letivo da escola e os parâmetros ao criar etapas (módulos).'
+            );
+        }
+
+        $escolaAnoLetivoId = DB::table('pmieducar.escola_ano_letivo')
+            ->where('ref_cod_escola', $schoolId)
+            ->where('ano', $year)
+            ->value('id');
+
+        if ($escolaAnoLetivoId === null) {
+            throw new AcademicYearServiceException(
+                'Ano letivo da escola '.$schoolId.' / '.$year.' sem `id` em pmieducar.escola_ano_letivo; não é possível criar etapas (ano_letivo_modulo).'
+            );
+        }
+
+        $escolaAnoLetivoId = (int) $escolaAnoLetivoId;
+
         $stagesData = [];
 
         foreach ($startDates as $key => $startDate) {
@@ -938,7 +957,7 @@ class AcademicYearService
             }
 
             $stagesData[] = array_merge($data, [
-                'escola_ano_letivo_id' => $academicYear->getKey(),
+                'escola_ano_letivo_id' => $escolaAnoLetivoId,
             ]);
         }
 
@@ -1133,7 +1152,7 @@ class AcademicYearService
                 ],
             ];
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $schoolName = $school ? $school->nome : "Escola ID {$schoolId}";
 
             return [
@@ -1398,7 +1417,7 @@ class AcademicYearService
                 ],
             ];
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $schoolName = $school->nome ?? "Escola ID {$schoolId}";
 
             return $this->createSchoolValidationError($schoolId, "Escola '{$schoolName}': {$e->getMessage()}", $schoolName);
