@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Process;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
@@ -77,9 +78,12 @@ class PerfisUsuariosMunicipioSeeder extends Seeder
                 self::NIVEL_INSTITUCIONAL,
                 'Perfil intermediário para equipe da SME que apoia escolas: consulta relatórios/documentos/exportações e também executa rotinas operacionais (alunos, turmas, enturmações), sem acesso a configurações sensíveis.'
             );
+            $menusMovimentacaoMatricula = $this->menuIdsMovimentacoesMatricula($menus);
+
             $menusSmeApoio = array_merge(
                 $menusSme,
-                $this->descendantMenuIdsWithProcess($ROOT_ESCOLA, $menus, excludeProcesses: $processosSensivesCadastros)
+                $this->descendantMenuIdsWithProcess($ROOT_ESCOLA, $menus, excludeProcesses: $processosSensivesCadastros),
+                $menusMovimentacaoMatricula,
             );
             // Operacional: cadastrar/alterar (sem excluir por padrão).
             $this->grant($smeApoioId, $menusSmeApoio, level: 2, allowDelete: false);
@@ -90,7 +94,10 @@ class PerfisUsuariosMunicipioSeeder extends Seeder
                 self::NIVEL_ESCOLA,
                 'Perfil para secretários(as) escolares: realiza cadastros e movimentações do dia a dia (alunos, turmas, enturmações, transferências) e acompanha relatórios, sem acesso a configurações sensíveis.'
             );
-            $menusSecretaria = $this->descendantMenuIdsWithProcess($ROOT_ESCOLA, $menus, excludeProcesses: $processosSensivesCadastros);
+            $menusSecretaria = array_merge(
+                $this->descendantMenuIdsWithProcess($ROOT_ESCOLA, $menus, excludeProcesses: $processosSensivesCadastros),
+                $menusMovimentacaoMatricula,
+            );
             $this->grant($secretarioId, $menusSecretaria, level: 2);
 
             // 4) Auxiliar de Secretaria — Cadastro básico: cadastra/atualiza, sem excluir.
@@ -99,7 +106,10 @@ class PerfisUsuariosMunicipioSeeder extends Seeder
                 self::NIVEL_ESCOLA,
                 'Perfil para auxiliares: executa cadastros básicos e rotinas assistidas, com foco em inclusão/atualização; não possui permissões de exclusão.'
             );
-            $menusAuxiliar = $this->descendantMenuIdsWithProcess($ROOT_ESCOLA, $menus, excludeProcesses: $processosSensivesCadastros);
+            $menusAuxiliar = array_merge(
+                $this->descendantMenuIdsWithProcess($ROOT_ESCOLA, $menus, excludeProcesses: $processosSensivesCadastros),
+                $menusMovimentacaoMatricula,
+            );
             $this->grant($auxiliarId, $menusAuxiliar, level: 2, allowDelete: false);
 
             // 5) Direção — Gestão (leitura + algumas ações): acompanha relatórios e faz poucas ações operacionais.
@@ -163,6 +173,31 @@ class PerfisUsuariosMunicipioSeeder extends Seeder
             'data_cadastro' => now(),
             'ativo' => 1,
         ], 'cod_tipo_usuario');
+    }
+
+    /**
+     * Bloco "Movimentações de Matrícula" (processo {@see Process::REGISTRATION_ACTIONS} e filhos:
+     * nova matrícula 680, enturmar 683, desenturmar 696, remanejar 695, etc.).
+     * Fora da árvore Escola (menu 3) — necessário para perfis operacionais da SME.
+     *
+     * @param  array<int, array{parent_id: ?int, process: ?int}>  $menus
+     * @return list<int>
+     */
+    private function menuIdsMovimentacoesMatricula(array $menus): array
+    {
+        $rootId = null;
+        foreach ($menus as $id => $meta) {
+            if (($meta['process'] ?? null) === Process::REGISTRATION_ACTIONS) {
+                $rootId = $id;
+                break;
+            }
+        }
+
+        if ($rootId === null) {
+            return [];
+        }
+
+        return $this->descendantMenuIdsWithProcess($rootId, $menus);
     }
 
     /**
