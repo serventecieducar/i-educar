@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
 
 class DefaultCadastroRacaTableSeeder extends Seeder
 {
@@ -14,8 +13,6 @@ class DefaultCadastroRacaTableSeeder extends Seeder
      */
     public function run()
     {
-        DB::unprepared(
-            file_get_contents(__DIR__ . '/../sqls/inserts/cadastro.raca.sql')
-        );
+        $this->call(RacaSeeder::class);
     }
 }

@@ -52,11 +52,14 @@ class SeederMaster extends Seeder
         //    para vinculação aos alunos.
         $this->call(BeneficioSocialSeeder::class);
 
-        // 9. Religiões: lista padrão (Católica, Evangélica, Espírita etc.)
+        // 9. Raças/cores (IBGE/INEP + complementares): garante raca_educacenso para exportação.
+        $this->call(RacaSeeder::class);
+
+        // 10. Religiões: lista padrão (Católica, Evangélica, Espírita etc.)
         //    usando firstOrCreate para não violar FK em bases com dados existentes.
         $this->call(ReligiaoSeeder::class);
 
-        // 10. Tipos de transferência: motivos padrão (mudança de endereço, de escola,
+        // 11. Tipos de transferência: motivos padrão (mudança de endereço, de escola,
         //     encerramento de turma, solicitação da família etc.).
         $this->call(TransferenciaTipoSeeder::class);
     }
