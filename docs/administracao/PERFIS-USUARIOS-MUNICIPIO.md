@@ -1,6 +1,19 @@
-## Seed de perfis (personas) — Rede Municipal
+# Perfis de usuário — rede municipal
 
-Este documento descreve os **perfis de usuário (tipos de usuário)** criados via seed para atender personas comuns em redes municipais.
+> **Tipo:** Guia de administração · **Módulo:** Permissões / tipos de usuário · **Público:** SME, TI da rede  
+> **Índice:** [Documentação](../README.md)
+
+Descrição dos **perfis de usuário (tipos de usuário)** criados via seed para personas comuns em redes municipais.
+
+---
+
+## Índice
+
+- [Como executar](#como-executar)
+- [Perfis criados](#perfis-criados)
+- [Como as permissões são aplicadas](#como-as-permissões-são-aplicadas)
+
+---
 
 ### Como executar
 

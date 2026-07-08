@@ -104,6 +104,24 @@ class GerarTurmasSeeder extends Seeder
         $nmTurma = $grade->nm_serie . ' - ' . $ano;
         $sglTurma = mb_substr($grade->nm_serie, 0, 3) . $ano;
 
+        $temEscolaSerie = DB::table('pmieducar.escola_serie')
+            ->where('ref_cod_escola', $school->cod_escola)
+            ->where('ref_cod_serie', $grade->cod_serie)
+            ->where('ativo', 1)
+            ->exists();
+
+        if (!$temEscolaSerie) {
+            $this->command?->line(sprintf(
+                'Escola %d: série %d (%s) sem vínculo em escola_serie — turma %d não criada.',
+                $school->cod_escola,
+                $grade->cod_serie,
+                $grade->nm_serie,
+                $ano
+            ));
+
+            return;
+        }
+
         $turma = LegacySchoolClass::firstOrCreate(
             [
                 'ref_ref_cod_escola' => $school->cod_escola,

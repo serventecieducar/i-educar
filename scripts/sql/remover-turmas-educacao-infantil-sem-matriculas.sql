@@ -1,0 +1,10 @@
+-- =============================================================================
+-- Turmas de Educação Infantil sem matrícula ativa — use os arquivos separados:
+--
+--   1) 01-previa-contagem-turmas-infantil.sql   (contagem)
+--   2) 01-previa-lista-turmas-infantil.sql      (lista)
+--   3) 02-excluir-turmas-infantil-sem-matriculas.sql  (exclusão, 1 comando)
+--
+-- Não execute vários arquivos numa mesma seleção. Clientes como phpPgAdmin
+-- podem gerar erro «SELECT COUNT(*) FROM (BEGIN;» se misturar consultas.
+-- =============================================================================
