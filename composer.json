@@ -27,12 +27,14 @@
         "composer/semver": "^3.2",
         "dex/composer-plug-and-play": "^0.26",
         "dex/frontier": "^0.17.0",
+        "geekcom/phpjasper": "^3.4",
         "google/recaptcha": "^1.2",
         "guzzlehttp/guzzle": "^7.3",
         "honeybadger-io/honeybadger-laravel": "^5.0",
         "intervention/image": "^2.6",
         "laravel/framework": "^13.0",
         "laravel/horizon": "^5.15",
+        "laravel/pulse": "^1.0",
         "laravel/sanctum": "^4.0",
         "laravel/socialite": "^5.26",
         "laravel/tinker": "^3.0",
@@ -64,6 +66,7 @@
     },
     "autoload": {
         "classmap": [
+            "src/Legacy/Portabilis/Model/Report/TipoBoletim.php",
             "ieducar/intranet/include",
             "ieducar/lib",
             "ieducar/modules/*/Model",

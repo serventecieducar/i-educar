@@ -14,11 +14,11 @@ class CreateSchemas extends Migration
     {
         DB::unprepared(
             '
-                CREATE SCHEMA cadastro;
-                CREATE SCHEMA modules;
-                CREATE SCHEMA pmieducar;
-                CREATE SCHEMA portal;
-                CREATE SCHEMA relatorio;
+                CREATE SCHEMA IF NOT EXISTS cadastro;
+                CREATE SCHEMA IF NOT EXISTS modules;
+                CREATE SCHEMA IF NOT EXISTS pmieducar;
+                CREATE SCHEMA IF NOT EXISTS portal;
+                CREATE SCHEMA IF NOT EXISTS relatorio;
             '
         );
     }
@@ -32,11 +32,11 @@ class CreateSchemas extends Migration
     {
         DB::unprepared(
             '
-                DROP SCHEMA cadastro;
-                DROP SCHEMA modules;
-                DROP SCHEMA pmieducar;
-                DROP SCHEMA portal;
-                DROP SCHEMA relatorio;
+                DROP SCHEMA IF EXISTS cadastro CASCADE;
+                DROP SCHEMA IF EXISTS modules CASCADE;
+                DROP SCHEMA IF EXISTS pmieducar CASCADE;
+                DROP SCHEMA IF EXISTS portal CASCADE;
+                DROP SCHEMA IF EXISTS relatorio CASCADE;
             '
         );
     }

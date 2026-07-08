@@ -157,6 +157,10 @@ return [
         'show_error_details' => true,
         'default_factory' => env('REPORTS_FACTORY', 'Portabilis_Report_ReportFactoryPHPJasper'),
         'source_path' => env('REPORTS_SOURCE_PATH', base_path('ieducar/modules/Reports/ReportSources/')),
+        // Pasta absoluta com o binário jasperstarter (geekcom/phpjasper). Vazio = vendor/.../bin (ver ReportFactoryPHPJasper).
+        'jasper_bin_dir' => env('JASPER_BIN_DIR', ''),
+        // Só usar true em hosts onde is_writable() falha em falso (ex.: alguns NFS); por omissão valida escrita em ReportSources.
+        'skip_sources_writable_check' => env('REPORTS_SKIP_SOURCES_WRITABLE_CHECK', false),
         'diario_classe' => [
             'dias_temporarios' => '30',
         ],

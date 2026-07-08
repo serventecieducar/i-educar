@@ -15,6 +15,7 @@ país por meio da educação. Junte-se a nós!**
 - [FAQ](#perguntas-frequentes-faq)
 - [Pacotes (módulos)](#pacotes-módulos)
 - [Upgrade](#upgrade)
+- [Documentação](#documentação)
 
 ## Sobre o i-Educar
 
@@ -68,7 +69,7 @@ O i-Educar possui um conjunto de pacotes (módulos) que o extendem e o tornam um
 pacote, siga as instruções de instalação encontradas no repositório do projeto.
 
 - [Pré-Matrícula Digital](https://github.com/portabilis/pre-matricula-digital/)
-- [Módulo de Relatórios](https://github.com/portabilis/i-educar-reports-package/)
+- [Módulo de Relatórios](https://github.com/portabilis/i-educar-reports-package/) — Jasper via `geekcom/phpjasper` no core; ao atualizar o pacote, ver [docs/PR-JASPER-REPORTS-PACKAGE.md](docs/PR-JASPER-REPORTS-PACKAGE.md) para o PR no GitHub.
 - [Módulo de Biblioteca](https://github.com/portabilis/i-educar-library-package/)
 - [Módulo de Transporte](https://github.com/portabilis/i-educar-transport-package/)
 - [Módulo do Educacenso](https://github.com/portabilis/i-educar-educacenso-package/)
@@ -76,6 +77,16 @@ pacote, siga as instruções de instalação encontradas no repositório do proj
 ## Upgrade
 
 Para realizar o _upgrade_ da versão do i-Educar, considere seguir os passos no [guia de atualização](UPGRADE.md).
+
+## Documentação
+
+Documentos adicionais estão em [docs/](docs/):
+
+- [Comandos em produção](docs/COMANDOS-PRODUCAO.md) — Git, Composer, Artisan, caches e relatórios.
+- [PR Jasper no pacote de relatórios (GitHub)](docs/PR-JASPER-REPORTS-PACKAGE.md) — remover `cossou/jasperphp` do `i-educar-reports-package`.
+- [Melhorias futuras](docs/MELHORIAS-FUTURAS.md) — documento executivo com eixos de evolução do produto.
+- [Multi-tenant](docs/MULTI-TENANT.md) — estado atual e requisitos para arquitetura multi-tenant e pacotes por tenant.
+- [Tutorial: database.php para multi-tenant](docs/TUTORIAL-DATABASE-MULTITENANT.md) — como configurar o Laravel para um banco por tenant.
 
 ## Perguntas frequentes (FAQ)
 

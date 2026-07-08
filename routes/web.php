@@ -3,6 +3,7 @@
 use App\Http\Controllers\EnrollmentInepController;
 use App\Http\Controllers\EnrollmentsPromotionController;
 use App\Http\Controllers\ExportController;
+use App\Http\Controllers\CleanupEmptyActiveSchoolClassesController;
 use App\Http\Controllers\SchoolClassController;
 use App\Http\Controllers\SocialiteCallbackController;
 use App\Http\Controllers\SocialiteRedirectController;
@@ -204,6 +205,9 @@ Route::group(['middleware' => ['ieducar.navigation', 'ieducar.footer', 'ieducar.
         ->name('schoolclass.store');
     Route::delete('/turma', [SchoolClassController::class, 'delete'])
         ->name('schoolclass.delete');
+
+    Route::post('/manutencao/excluir-turmas-ativas-vazias', CleanupEmptyActiveSchoolClassesController::class)
+        ->name('maintenance.delete-empty-active-school-classes');
 
     Route::post('/enrollments-promotion', [EnrollmentsPromotionController::class, 'processEnrollmentsPromotionJobs'])
         ->name('enrollments.promotion');

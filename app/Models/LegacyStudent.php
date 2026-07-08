@@ -49,6 +49,7 @@ class LegacyStudent extends LegacyModel
 
     protected $fillable = [
         'ref_idpes',
+        'ref_cod_religiao',
         'tipo_responsavel',
         'codigo_sistema',
         'ativo',

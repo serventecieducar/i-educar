@@ -11,7 +11,7 @@
                         @if($submenu->hasLink())
                             <li>
                                 <a class="@if(in_array($submenu->getKey(), $menuPaths)) {{'ieducar-sidebar-menu-active'}} @endif"
-                                   href="javascript:void(0)">{{ $submenu->title }}</a>
+                                   href="{{ ($submenu->isLink() && !$submenu->hasLinkInSubmenu()) ? ($submenu->link ?? 'javascript:void(0)') : 'javascript:void(0)' }}">{{ $submenu->title }}</a>
                                 @if($submenu->hasLinkInSubmenu())
                                     <ul class="ieducar-sub-menu clearfix">
                                         @foreach($submenu->children->sortBy('order') as $c1)
