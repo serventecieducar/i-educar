@@ -26,10 +26,10 @@
         "aws/aws-sdk-php-laravel": "^3.11",
         "composer/semver": "^3.2",
         "dex/composer-plug-and-play": "^0.26",
-        "dex/frontier": "^0.17.0",
+        "dex/frontier": "^0.18.0",
         "geekcom/phpjasper": "^3.4",
         "google/recaptcha": "^1.2",
-        "guzzlehttp/guzzle": "^7.3",
+        "guzzlehttp/guzzle": "^7.15.2",
         "honeybadger-io/honeybadger-laravel": "^5.0",
         "intervention/image": "^2.6",
         "laravel/framework": "^13.0",
@@ -43,8 +43,8 @@
         "league/flysystem-aws-s3-v3": "^3.0",
         "league/flysystem-ftp": "^3.0",
         "league/flysystem-sftp-v3": "^3.0",
-        "maatwebsite/excel": "^3.1",
-        "phpoffice/phpspreadsheet": "1.30.0",
+        "maatwebsite/excel": "^4.0",
+        "phpoffice/phpspreadsheet": "^5.8",
         "predis/predis": "^2.3",
         "psr/simple-cache": "^3.0",
         "socialiteproviders/laravelpassport": "^4.3",
@@ -61,6 +61,7 @@
         "mockery/mockery": "^1.6",
         "nunomaduro/collision": "^8.6",
         "pestphp/pest": "^4.0",
+        "roave/security-advisories": "dev-latest",
         "spatie/laravel-ignition": "^2.0",
         "symfony/yaml": "^7.0"
     },
@@ -127,9 +128,10 @@
             "@php artisan migrate --force --ansi"
         ],
         "testing-install": [
+            "@putenv DB_DATABASE=testing",
+            "@putenv LEGACY_SEED_DATA=false",
             "@composer install",
-            "@php artisan key:generate --ansi",
-            "@php artisan migrate --force --ansi --env=testing"
+            "@php artisan migrate --force --ansi"
         ],
         "post-install-cmd": [
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""
@@ -146,23 +148,12 @@
         "optimize-autoloader": true,
         "preferred-install": "dist",
         "sort-packages": true,
+        "platform-check": false,
         "allow-plugins": {
             "dex/composer-plug-and-play": true,
             "pestphp/pest-plugin": true,
             "phpstan/extension-installer": true,
             "php-http/discovery": true
-        },
-        "audit": {
-            "ignore": [
-                "PKSA-gz3f-3cz3-3wsw",
-                "PKSA-x13r-n4wc-4gcr",
-                "PKSA-8cfg-tzhf-fr83",
-                "PKSA-hznc-gbby-6w16",
-                "PKSA-jtdk-dcr5-f11n",
-                "PKSA-x678-4z45-v3d5",
-                "PKSA-93qv-9n9h-6k6p",
-                "PKSA-k22t-f949-t9g6"
-            ]
         }
     },
     "minimum-stability": "dev",

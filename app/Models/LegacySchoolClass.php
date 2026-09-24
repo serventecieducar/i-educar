@@ -5,7 +5,9 @@ namespace App\Models;
 use App\Models\Builders\LegacySchoolClassBuilder;
 use App\Models\Enums\DayOfWeek;
 use App\Models\View\Discipline;
+use App_Model_MatriculaSituacao;
 use Carbon\Carbon;
+use iEducar\Modules\Educacenso\Model\EtapaEnsino;
 use iEducar\Modules\Educacenso\Model\OrganizacaoCurricular;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -487,6 +489,34 @@ class LegacySchoolClass extends Model
     }
 
     /**
+     * Retorna as enturmações ativas cujas matrículas podem ser canceladas.
+     *
+     * Critérios: matrícula ativa, em andamento e sem solicitação de
+     * transferência ativa, como no cancelamento individual disponível em
+     * `educar_matricula_det.php`, além do ano da matrícula igual ao da turma,
+     * restrição adicional herdada de `getActiveEnrollments`. O `whereHas`
+     * filtra as enturmações de fato, diferente do `with` restrito do método
+     * irmão, que apenas deixa a relação nula.
+     *
+     * @return Collection<int, LegacyEnrollment>
+     */
+    public function getActiveEnrollmentsWithCancellableRegistration() // @phpstan-ignore-line
+    {
+        return $this->enrollments()
+            ->whereHas('registration', function ($query) {
+                /** @var Builder $query */
+                $query->where('ano', $this->year); // @phpstan-ignore-line
+                $query->where('ativo', 1);
+                $query->where('aprovado', App_Model_MatriculaSituacao::EM_ANDAMENTO);
+                $query->whereDoesntHave('transferEnd');
+            })
+            ->with('registration.student.person')
+            ->where('ativo', 1)
+            ->orderBy('sequencial_fechamento')
+            ->get();
+    }
+
+    /**
      * @return BelongsTo<LegacySchoolGrade, $this>
      */
     public function schoolGrade(): BelongsTo
@@ -657,7 +687,7 @@ class LegacySchoolClass extends Model
     {
         $organizacaoCurricular = array_map('intval', (array) transformStringFromDBInArray($this->organizacao_curricular));
         $temIftp = in_array(OrganizacaoCurricular::ITINERARIO_FORMACAO_TECNICA_PROFISSIONAL, $organizacaoCurricular, strict: true);
-        $etapaValida = in_array((int) $this->etapa_educacenso, [39, 40, 67, 68, 73, 75], strict: true);
+        $etapaValida = in_array((int) $this->etapa_educacenso, EtapaEnsino::ETAPAS_PERMITEM_CARGA_HORARIA_INTEGRALIZADA, strict: true);
 
         return $temIftp || $etapaValida;
     }

@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\LegacyGeneralConfiguration;
 use iEducar\Reports\Contracts\TeacherReportCard;
 
 class ReportController extends ApiCoreController
@@ -43,7 +44,7 @@ class ReportController extends ApiCoreController
                AND ref_cod_matricula = $1
                AND matricula.ativo = 1
                AND (matricula_turma.ativo = 1 OR matricula_turma.transferido = TRUE)
-          ORDER BY matricula_turma.sequencial
+          ORDER BY matricula_turma.ativo DESC, matricula_turma.sequencial, matricula_turma.id
              LIMIT 1
         ';
 
@@ -140,10 +141,9 @@ class ReportController extends ApiCoreController
             $boletimProfessorReport->addArg('situacao', (int) $this->getRequest()->situacao ?? 0);
             $boletimProfessorReport->addArg('situacao_matricula', (bool) $this->getRequest()->situacao_matricula);
 
-            $configuracoes = new clsPmieducarConfiguracoesGerais;
-            $configuracoes = $configuracoes->detalhe();
-
-            $modelo = $configuracoes['modelo_boletim_professor'];
+            $modelo = LegacyGeneralConfiguration::query()
+                ->forActiveInstitution()
+                ->value('modelo_boletim_professor');
 
             $boletimProfessorReport->addArg('modelo', $modelo);
             $boletimProfessorReport->addArg('linha', 0);

@@ -5,10 +5,12 @@ use App\Events\UserUpdated;
 use App\Models\LegacyBondType;
 use App\Models\LegacyEmployee;
 use App\Models\LegacyPerson;
+use App\Models\LegacyUser;
 use App\Models\LegacyUserSchool;
 use App\Models\LegacyUserType;
 use App\Services\ChangeUserPasswordService;
 use App\Services\ValidateUserPasswordService;
+use App\Support\View\SearchParameters;
 use App\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
@@ -71,9 +73,8 @@ return new class extends clsCadastro
                 $this->data_inicial = Portabilis_Date_Utils::pgSQLToBr($this->data_inicial);
             }
 
-            $obj = new clsPmieducarUsuario($this->ref_pessoa);
-
-            $registro = $obj->detalhe();
+            $usuario = LegacyUser::query()->find($this->ref_pessoa);
+            $registro = $usuario?->getAttributes();
 
             if ($registro) {
                 foreach ($registro as $campo => $val) {
@@ -122,7 +123,7 @@ return new class extends clsCadastro
 
             $this->campoRotulo(nome: 'nome', campo: 'Nome', valor: $this->nome);
         } else {
-            $parametros = new clsParametrosPesquisas;
+            $parametros = new SearchParameters;
             $parametros->setSubmit(1);
             $parametros->setPessoa('F');
             $parametros->setPessoaNovo('S');
@@ -266,17 +267,7 @@ return new class extends clsCadastro
         }
 
         if (LegacyEmployee::create($dadosFuncionario)) {
-            if ($this->ref_cod_instituicao) {
-                $obj = new clsPmieducarUsuario(cod_usuario: $this->ref_pessoa, ref_cod_escola: null, ref_cod_instituicao: $this->ref_cod_instituicao, ref_funcionario_cad: $this->pessoa_logada, ref_funcionario_exc: $this->pessoa_logada, ref_cod_tipo_usuario: $this->ref_cod_tipo_usuario, data_cadastro: null, data_exclusao: null, ativo: 1);
-            } else {
-                $obj = new clsPmieducarUsuario(cod_usuario: $this->ref_pessoa, ref_cod_escola: null, ref_cod_instituicao: null, ref_funcionario_cad: $this->pessoa_logada, ref_funcionario_exc: $this->pessoa_logada, ref_cod_tipo_usuario: $this->ref_cod_tipo_usuario, data_cadastro: null, data_exclusao: null, ativo: 1);
-            }
-
-            if ($obj->existe()) {
-                $cadastrou = $obj->edita();
-            } else {
-                $cadastrou = $obj->cadastra();
-            }
+            $cadastrou = $this->gravaUsuario(ativo: 1);
 
             $this->insereUsuarioEscolas(codUsuario: $this->ref_pessoa, escolas: $this->escola);
 
@@ -360,37 +351,7 @@ return new class extends clsCadastro
         }
 
         if (LegacyEmployee::whereKey($this->ref_pessoa)->update($dadosFuncionario)) {
-            if ($this->ref_cod_instituicao) {
-                $obj = new clsPmieducarUsuario(
-                    cod_usuario: $this->ref_pessoa,
-                    ref_cod_escola: null,
-                    ref_cod_instituicao: $this->ref_cod_instituicao,
-                    ref_funcionario_cad: $this->pessoa_logada,
-                    ref_funcionario_exc: $this->pessoa_logada,
-                    ref_cod_tipo_usuario: $this->ref_cod_tipo_usuario,
-                    data_cadastro: null,
-                    data_exclusao: null,
-                    ativo: $this->ativo
-                );
-            } else {
-                $obj = new clsPmieducarUsuario(
-                    cod_usuario: $this->ref_pessoa,
-                    ref_cod_escola: null,
-                    ref_cod_instituicao: null,
-                    ref_funcionario_cad: $this->pessoa_logada,
-                    ref_funcionario_exc: $this->pessoa_logada,
-                    ref_cod_tipo_usuario: $this->ref_cod_tipo_usuario,
-                    data_cadastro: null,
-                    data_exclusao: null,
-                    ativo: $this->ativo
-                );
-            }
-
-            if ($obj->existe()) {
-                $editou = $obj->edita();
-            } else {
-                $editou = $obj->cadastra();
-            }
+            $editou = $this->gravaUsuario(ativo: $this->ativo);
 
             $this->insereUsuarioEscolas(codUsuario: $this->ref_pessoa, escolas: $this->escola);
 
@@ -517,12 +478,72 @@ return new class extends clsCadastro
         $validateUserPasswordService->execute($password);
     }
 
+    private function gravaUsuario($ativo): bool
+    {
+        $codUsuario = $this->ref_pessoa;
+
+        if (!is_numeric($codUsuario)) {
+            return false;
+        }
+
+        $instituicao = $this->ref_cod_instituicao;
+        $tipoUsuario = $this->ref_cod_tipo_usuario;
+        $funcionario = $this->pessoa_logada;
+
+        if (LegacyUser::query()->whereKey($codUsuario)->exists()) {
+            if (!is_numeric($funcionario)) {
+                return false;
+            }
+
+            $dados = [
+                'ref_cod_instituicao' => is_numeric($instituicao) ? $instituicao : null,
+                'ref_funcionario_cad' => $funcionario,
+                'ref_funcionario_exc' => $funcionario,
+            ];
+
+            if (is_numeric($tipoUsuario)) {
+                $dados['ref_cod_tipo_usuario'] = $tipoUsuario;
+            }
+
+            if (is_numeric($ativo)) {
+                $dados['ativo'] = $ativo;
+                $dados['data_exclusao'] = ($ativo === 1) ? null : now();
+            }
+
+            LegacyUser::query()->whereKey($codUsuario)->update($dados);
+
+            return true;
+        }
+
+        if (!is_numeric($funcionario) || !is_numeric($tipoUsuario)) {
+            return false;
+        }
+
+        $dados = [
+            'cod_usuario' => $codUsuario,
+            'ref_funcionario_cad' => $funcionario,
+            'ref_cod_tipo_usuario' => $tipoUsuario,
+            'data_cadastro' => now(),
+            'ativo' => 1,
+        ];
+
+        if (is_numeric($instituicao)) {
+            $dados['ref_cod_instituicao'] = $instituicao;
+        }
+
+        LegacyUser::query()->create($dados);
+
+        return true;
+    }
+
     private function montaBotoesDeAcao(): void
     {
         $funcionarioExiste = LegacyEmployee::whereKey($this->ref_pessoa)->exists();
-        $usuario = (new clsPmieducarUsuario($this->ref_pessoa))->detalhe();
+        $usuario = LegacyUser::query()
+            ->whereKey($this->ref_pessoa)
+            ->exists();
 
-        $edita = $funcionarioExiste && $usuario !== false;
+        $edita = $funcionarioExiste && $usuario;
 
         $this->url_cancelar = $edita
             ? "educar_usuario_det.php?ref_pessoa={$this->ref_pessoa}"

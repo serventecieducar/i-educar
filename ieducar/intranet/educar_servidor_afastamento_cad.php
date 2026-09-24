@@ -1,8 +1,10 @@
 <?php
 
+use App\Models\Employee;
 use App\Models\EmployeeWithdrawal;
 use App\Models\LegacyPerson;
 use App\Models\WithdrawalReason;
+use App\Services\EmployeeService;
 use App\Services\FileService;
 use App\Services\UrlPresigner;
 use App\Support\View\Employee\EmployeeReturn;
@@ -175,22 +177,16 @@ return new class extends clsCadastro
             $this->campoData('data_retorno', 'Data de Retorno', $this->data_retorno, true);
         }
 
-        $obj_servidor = new clsPmieducarServidor(
-            $this->ref_cod_servidor,
-            null,
-            null,
-            null,
-            null,
-            null,
-            1,
-            $this->ref_cod_instituicao
-        );
+        $servidorExiste = is_numeric($this->ref_cod_servidor)
+            && is_numeric($this->ref_cod_instituicao)
+            && Employee::query()
+                ->whereEmployee($this->ref_cod_servidor)
+                ->whereInstitution($this->ref_cod_instituicao)
+                ->exists();
 
-        $det_servidor = $obj_servidor->detalhe();
-
-        if ($det_servidor) {
+        if ($servidorExiste) {
             // Se for professor
-            if ($obj_servidor->isProfessor() == true) {
+            if ((new EmployeeService)->isTeacher($this->ref_cod_servidor, $this->ref_cod_instituicao)) {
                 $obj = new clsPmieducarQuadroHorarioHorarios;
 
                 // Pega a lista de aulas alocadas para este servidor
@@ -239,7 +235,7 @@ return new class extends clsCadastro
                         $script = "<script>\nvar num_alocacao = {$tamanho};\n";
                         $script .= "var array_servidores = Array();\n";
 
-                        $idsSubstitutos = collect($this->alocacao_array)->pluck('ref_cod_substituto')->filter('is_numeric')->unique()->all();
+                        $idsSubstitutos = collect($this->alocacao_array)->pluck('ref_cod_substituto')->filter(fn ($id) => is_numeric($id))->unique()->all();
                         $nomesPorSubstituto = $idsSubstitutos
                             ? LegacyPerson::query()->whereIn('idpes', $idsSubstitutos)->pluck('nome', 'idpes')
                             : collect();

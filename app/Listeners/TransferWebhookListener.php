@@ -34,11 +34,16 @@ class TransferWebhookListener
 
         $registration = $event->transfer->oldRegistration;
 
+        $registration->update([
+            'bloquear_troca_de_situacao' => true,
+        ]);
+
         $callbackUrl = route('webhook.transfer.callback', ['id' => $event->transfer->getKey()]);
 
         $response = Http::withHeader('token', trim($this->token))
             ->post(trim($this->url, '/') . '/api/v2/ieducar_api_student_transfers', [
                 'student_enrollment_api_code' => $registration->getKey(),
+                'transfer_date' => $event->transfer?->data_transferencia?->format('Y-m-d'),
                 'callback_url' => $callbackUrl,
             ]);
 

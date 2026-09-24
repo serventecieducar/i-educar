@@ -680,7 +680,7 @@ return new class extends clsCadastro
         $this->inputsHelper()->multipleSearchCustom(attrName: '', inputOptions: $options, helperOptions: $helperOptions);
 
         $options = [
-            'label' => 'Carga horária total do curso (em horas)',
+            'label' => 'Carga horária total (em horas)',
             'placeholder' => 'em horas',
             'required' => false,
             'max_length' => 4,
@@ -1042,15 +1042,6 @@ return new class extends clsCadastro
             campo: $label,
             valor: "<div id='disciplinas'>$disciplinas</div>"
         );
-    }
-
-    protected function getEscolaSerie($escolaId, $serieId)
-    {
-        $escolaSerie = new clsPmieducarEscolaSerie;
-        $escolaSerie->ref_cod_escola = $escolaId;
-        $escolaSerie->ref_cod_serie = $serieId;
-
-        return $escolaSerie->detalhe();
     }
 
     public function gerarJsonDosModulos()
