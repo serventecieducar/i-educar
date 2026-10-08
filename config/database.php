@@ -3,7 +3,7 @@
 use Illuminate\Support\Str;
 use Pdo\Mysql;
 
-return [
+$config = [
 
     /*
     |--------------------------------------------------------------------------
@@ -98,6 +98,26 @@ return [
             'sslmode' => 'prefer',
         ],
 
+        /*
+        | Municípios extras não ficam neste arquivo.
+        | Copie config/database.tenants.php.example para config/database.tenants.php
+        | (fora do git) e preencha uma conexão por cidade.
+        |
+        | 'sao_jose' => [
+        |     'driver' => 'pgsql',
+        |     'host' => env('DB_HOST', '127.0.0.1'),
+        |     'port' => env('DB_PORT', '5432'),
+        |     'database' => env('SAO_JOSE_DATABASE'),
+        |     'username' => env('DB_USERNAME'),
+        |     'password' => env('DB_PASSWORD'),
+        |     'charset' => env('DB_CHARSET', 'utf8'),
+        |     'prefix' => '',
+        |     'prefix_indexes' => true,
+        |     'search_path' => 'public',
+        |     'sslmode' => 'prefer',
+        | ],
+        */
+
         'sqlsrv' => [
             'driver' => 'sqlsrv',
             'url' => env('DB_URL'),
@@ -173,3 +193,14 @@ return [
     ],
 
 ];
+
+$tenantConnectionsFile = __DIR__ . '/database.tenants.php';
+
+if (is_file($tenantConnectionsFile)) {
+    $config['connections'] = array_merge(
+        $config['connections'],
+        require $tenantConnectionsFile
+    );
+}
+
+return $config;

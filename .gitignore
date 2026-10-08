@@ -18,6 +18,8 @@ ieducar-*.tar.gz
 .env
 .env.host
 .env.testing
+/config/tenants.local.php
+/config/database.tenants.php
 .php-cs-fixer.cache
 docker-compose.override.yml
 

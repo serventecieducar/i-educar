@@ -22,6 +22,12 @@ class ConnectTenantDatabase
      */
     public function handle($request, Closure $next)
     {
+        if ($this->isLandingHost($request)) {
+            return response()->view('tenants.landing', [
+                'tenants' => config('tenants.catalog', []),
+            ]);
+        }
+
         $connections = config('database.connections');
 
         $tenant = $this->getTenant($request);
@@ -60,10 +66,32 @@ class ConnectTenantDatabase
     public function getDefaultTenantResolver()
     {
         return function (Request $request) {
-            $host = str_replace('-', '', $request->getHost());
+            $host = $request->getHost();
+            $aliases = config('tenants.hosts', []);
 
-            return Str::replaceFirst('.' . config('app.default_host'), '', $host);
+            if (isset($aliases[$host])) {
+                return $aliases[$host];
+            }
+
+            $defaultHost = (string) config('app.default_host');
+
+            if ($defaultHost === 'localhost') {
+                return $host;
+            }
+
+            $host = str_replace('-', '', $host);
+
+            return Str::replaceFirst('.' . $defaultHost, '', $host);
         };
+    }
+
+    private function isLandingHost(Request $request): bool
+    {
+        if (!config('app.multi_tenant')) {
+            return false;
+        }
+
+        return in_array($request->getHost(), config('tenants.landing_hosts', []), true);
     }
 
     /**

@@ -1,0 +1,25 @@
+<?php
+
+/*
+| Copie para config/database.tenants.php e preencha uma conexão por município.
+| Esse arquivo copiado não entra no git. O nome do banco vem do ambiente.
+|
+| return [
+|     'sao_jose' => [
+|         'driver' => 'pgsql',
+|         'url' => env('DB_URL'),
+|         'host' => env('DB_HOST', '127.0.0.1'),
+|         'port' => env('DB_PORT', '5432'),
+|         'database' => env('SAO_JOSE_DATABASE'),
+|         'username' => env('DB_USERNAME'),
+|         'password' => env('DB_PASSWORD'),
+|         'charset' => env('DB_CHARSET', 'utf8'),
+|         'prefix' => '',
+|         'prefix_indexes' => true,
+|         'search_path' => 'public',
+|         'sslmode' => 'prefer',
+|     ],
+| ];
+*/
+
+return [];

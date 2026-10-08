@@ -190,7 +190,7 @@ Cada domínio tem **pasta própria** no servidor e **base PostgreSQL própria**.
 
 ### Multi-tenant (`APP_MULTI_TENANT=true`)
 
-Se no futuro activarem multi-tenant, o ponto 5 aplica-se **por tenant** (várias bases no mesmo código); o diagnóstico Artisan usa só o `DB_CONNECTION` do `.env`.
+Com várias bases no mesmo código, o ponto 5 aplica-se **por tenant**. O diagnóstico Artisan usa só o `DB_CONNECTION` do `.env`. O nome do banco da instituição no pedido HTTP fica em `config('legacy.app.database.dbname')` depois do `LoadSettings`. Como condicionar pacote, seed ou fila a uma instituição: [Multi-tenant](MULTI-TENANT.md).
 
 ---
 

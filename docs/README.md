@@ -11,6 +11,8 @@
 | Matricular o mesmo aluno em duas escolas no mesmo ano (regular + AEE ou atividade complementar) | [Matrícula dupla](operacao/MATRICULA-DUPLA-REGULAR-AEE-ATIVIDADE-COMPLEMENTAR.md) |
 | Executar seeds de perfis de usuário na rede | [Perfis de usuário (município)](administracao/PERFIS-USUARIOS-MUNICIPIO.md) |
 | Atualizar produção, caches, Jasper e filas | [Comandos em produção](infraestrutura/COMANDOS-PRODUCAO.md) |
+| Limitar pacote ou opção a um município no multi-tenant | [Multi-tenant](infraestrutura/MULTI-TENANT.md) |
+| Subir o localhost com dois tenants | [Implementação multi-tenant](infraestrutura/MULTI-TENANT-IMPLEMENTACAO.md) |
 | Entender o pacote de relatórios Portabilis | [Doc executivo — relatórios](relatorios/DOC-EXECUTIVO-PACOTE-RELATORIOS-PORTABILIS.md) |
 | Notas sobre PR do pacote Jasper | [PR — Jasper reports package](relatorios/PR-JASPER-REPORTS-PACKAGE.md) |
 
@@ -41,6 +43,8 @@ Comandos e rotinas de servidor.
 | Documento | Descrição |
 |-----------|-----------|
 | [Comandos em produção](infraestrutura/COMANDOS-PRODUCAO.md) | Git, Composer, caches, migrações, Jasper, PHP-FPM e filas |
+| [Multi-tenant](infraestrutura/MULTI-TENANT.md) | `legacy.app.database.dbname`, conexão por domínio e pacote de uma instituição |
+| [Implementação multi-tenant](infraestrutura/MULTI-TENANT-IMPLEMENTACAO.md) | Localhost com tenant 1 e tenant 2; transporte só no primeiro |
 
 ### Relatórios
 
