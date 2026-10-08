@@ -450,8 +450,8 @@ class ConfiguracaoEscolarSeeder extends Seeder
             if ($sequenciasUpsert !== []) {
                 DB::table('pmieducar.sequencia_serie')->upsert(
                     $sequenciasUpsert,
-                    ['ref_serie_origem'],
-                    ['ref_serie_destino', 'ref_usuario_cad', 'ativo', 'data_cadastro']
+                    ['ref_serie_origem', 'ref_serie_destino'],
+                    ['ref_usuario_cad', 'ativo', 'data_cadastro']
                 );
             }
 
