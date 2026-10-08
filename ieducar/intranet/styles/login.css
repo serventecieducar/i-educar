@@ -83,6 +83,40 @@ button.submit:disabled {
   cursor: not-allowed !important;;
 }
 
+.login-actions {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.login-actions .submit,
+.login-actions .pre-registration {
+  flex: 1 1 0;
+  margin: 0;
+  min-height: 44px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 3px;
+  font-size: 14px;
+  line-height: 1;
+  padding: 12px 16px;
+}
+
+.login-actions .pre-registration {
+  background-color: #0f6e78;
+  color: #fff;
+  text-decoration: none;
+  padding: 12px 16px;
+}
+
+.login-actions .pre-registration .fa {
+  font-size: 16px;
+}
+
 #footer {
   margin-top: 10px;
   padding: 10px 0;
@@ -131,8 +165,9 @@ button.submit:disabled {
 }
 
 .remember {
-  float: right;
-  padding-top: 25px;
+  clear: both;
+  text-align: right;
+  padding-top: 14px;
 }
 
 #mensagens {
@@ -188,16 +223,23 @@ button.submit:disabled {
   border: solid 1px #ffb2b2 ;
 }
 
+.password-field {
+  position: relative;
+  margin: 5px 0 10px;
+}
+
+.password-field input#password {
+  margin: 0;
+  padding-right: 42px;
+}
+
 #eye {
   cursor: pointer;
   position: absolute;
-  margin-top: -37px;
-  margin-left: 335px;
+  top: 50%;
+  right: 12px;
+  margin: 0;
+  transform: translateY(-50%);
   color: #188ad1;
-}
-@-moz-document url-prefix() {
-  #eye {
-    margin-top: 17px !important;
-    margin-left: -25px !important;
-  }
+  line-height: 1;
 }

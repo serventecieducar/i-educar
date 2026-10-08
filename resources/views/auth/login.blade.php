@@ -12,10 +12,16 @@
         <input type="text" name="login" id="login" value="{{ old('login') }}">
 
         <label for="password">Senha:</label>
-        <input type="password" name="password" id="password">
-        <i class="fa fa-eye-slash" id="eye" onclick="showPassword()" onkeyup="showPassword()" aria-hidden="true"></i>
+        <div class="password-field">
+            <input type="password" name="password" id="password">
+            <i class="fa fa-eye-slash" id="eye" onclick="showPassword()" onkeyup="showPassword()" aria-hidden="true"></i>
+        </div>
 
-        <button id="form-login-submit" type="submit" class="submit">Entrar</button>
+        <div class="login-actions">
+            <button id="form-login-submit" type="submit" class="submit">Entrar</button>
+
+            @includeIf('prematricula::auth.login-button')
+        </div>
 
         <div class="remember">
             <a href="{{ route('password.request') }}">Esqueceu sua senha?</a>
