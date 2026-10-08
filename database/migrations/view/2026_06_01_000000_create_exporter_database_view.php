@@ -9,6 +9,8 @@ class CreateExporterDatabaseView extends Migration
 
     public function up(): void
     {
+        $this->down();
+
         $this->createView('public.exporter_person');
         $this->createView('public.exporter_student');
         $this->createView('public.exporter_student_grouped_registration');
