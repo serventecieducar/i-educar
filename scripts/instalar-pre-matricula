@@ -227,6 +227,32 @@ if barra.is_file():
     barra.write_text(texto)
 PY
 
+processos="${PKG}/resources/ts/modules/processes/components/ProcessList.vue"
+if [[ -f "${processos}" ]] && grep -q "name: 'process.show'" "${processos}"; then
+  python3 - "${processos}" <<'PY'
+from pathlib import Path
+import sys
+caminho = Path(sys.argv[1])
+texto = caminho.read_text()
+texto = texto.replace(
+    ":to=\"{ name: 'process.show', params: { id: process.id } }\"",
+    ":to=\"{ name: 'process.update', params: { id: process.id } }\"",
+    1,
+)
+antigo = """          hoverable
+          class="mb-3"
+        >"""
+novo = """          hoverable
+          class="mb-3"
+          style="cursor: pointer"
+          @click="router.push({ name: 'process.update', params: { id: process.id } })"
+        >"""
+if antigo in texto:
+    texto = texto.replace(antigo, novo, 1)
+caminho.write_text(texto)
+PY
+fi
+
 lista="${PKG}/resources/ts/modules/preregistration/components/PreRegistrationList.vue"
 if [[ -f "${lista}" ]] && grep -q 'reactiveRoute' "${lista}"; then
   python3 - "${lista}" <<'PY'
