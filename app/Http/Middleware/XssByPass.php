@@ -15,8 +15,8 @@ class XssByPass
      */
     public function handle($request, Closure $next)
     {
-        $response = $next($request)
-            ->header('X-XSS-Protection', 0);
+        $response = $next($request);
+        $response->headers->set('X-XSS-Protection', '0');
 
         return $response;
     }
