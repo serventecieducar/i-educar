@@ -146,17 +146,11 @@ import re
 import sys
 from pathlib import Path
 
+marca = "M13.12,10,8.06,1.22,2.88,10"
+
 def botao(extra=""):
-    classe = "pmd-voltar bg-white border-primary-light" + extra
-    return f"""    <a
-      href="/intranet/index.php"
-      class="{classe}"
-      title="Voltar ao i-Educar"
-      aria-label="Voltar ao i-Educar"
-    >
-      <img src="/svg/i-educar-fav.svg" alt="">
-    </a>
-"""
+    classe = "pmd-voltar" + extra
+    return f"""<a href="/intranet/index.php" class="{classe}" title="Voltar ao i-Educar" aria-label="Voltar ao i-Educar"><svg viewBox="0 0 16 16" width="28" height="28" aria-hidden="true"><path fill="#0072ff" d="{marca}l.65.39.32-.53a1.93,1.93,0,0,1,1.57-.77A1.78,1.78,0,0,1,7.29,10.7H8.71a1.77,1.77,0,0,1,1.86-1.62,2,2,0,0,1,1.78,1.1h0l.11.2ZM10.57,8.32A2.58,2.58,0,0,0,8,10.22,2.6,2.6,0,0,0,5.42,8.31a2.84,2.84,0,0,0-.72.1L8.05,2.74l3.28,5.68A2.68,2.68,0,0,0,10.57,8.32Z"/><polygon fill="#8314f7" points="7.04 5.32 8.98 5.32 8.01 3.73 7.04 5.32"/><rect fill="#8314f7" x="2.87" y="11.57" width="0.77" height="3.21"/><rect fill="#8314f7" x="12.36" y="11.57" width="0.77" height="3.21"/><rect fill="#8314f7" x="7.63" y="11.57" width="0.77" height="1.89"/></svg></a>"""
 
 estilo = """
 .pmd-voltar {
@@ -167,36 +161,37 @@ estilo = """
   width: 48px;
   height: 48px;
   padding: 0;
+  border: 1px solid #b9d4f5;
   border-radius: 3px;
+  background: #fff;
   line-height: 0;
   text-decoration: none;
 }
-.pmd-voltar img {
+.pmd-voltar svg {
+  display: block;
   width: 28px;
   height: 28px;
 }
 """
 
-def sem_botao_antigo(texto: str) -> str:
-    texto = re.sub(
-        r'\s*<a[^>]*class="pmd-voltar"[^>]*>[\s\S]*?</a>\s*',
-        "\n",
-        texto,
-        count=1,
-    )
-    texto = re.sub(r"\n<style[\s\S]*?\.pmd-voltar \{[\s\S]*?</style>\s*$", "\n", texto)
-    return texto
+def sem_retorno(texto: str) -> str:
+    return re.sub(r"<a\b[^>]*\bpmd-voltar\b[^>]*>[\s\S]*?</a>\s*", "", texto)
+
+def garantir(texto: str, extra: str) -> str:
+    texto = sem_retorno(texto)
+    if "<x-btn" not in texto:
+        return texto
+    return texto.replace("<x-btn", botao(extra) + "\n    <x-btn", 1)
 
 menu = Path(sys.argv[1])
 if menu.is_file():
-    texto = sem_botao_antigo(menu.read_text())
-    if "i-educar-fav.svg" not in texto:
-        texto = texto.replace("    <x-btn", botao() + "    <x-btn", 1)
+    texto = garantir(menu.read_text(), "")
     texto = texto.replace(
         'class="pr-0 pr-lg-4 position-relative"\n    style="height: 53px"',
         'class="pmd-menu-logado pr-0 pr-lg-4 position-relative"',
         1,
     )
+    texto = texto.replace('class="d-none d-lg-block position-relative"', 'class="position-relative"', 1)
     texto = texto.replace('class="pr-3 float-left authenticated_user"', 'class="authenticated_user"', 1)
     texto = texto.replace('<div class="pt-3">', '<div class="pmd-menu-lista">', 1)
     if ".pmd-menu-logado {" not in texto:
@@ -215,18 +210,18 @@ if menu.is_file():
   right: 1.5em;
 }
 """ + estilo + "</style>\n"
+    elif ".pmd-voltar {" not in texto:
+        texto += "<style lang=\"scss\" scoped>" + estilo + "</style>\n"
     menu.write_text(texto)
 
 barra = Path(sys.argv[2])
 if barra.is_file():
-    texto = sem_botao_antigo(barra.read_text())
+    texto = garantir(barra.read_text(), " d-lg-none")
     texto = texto.replace(
         '<private-menu-desktop v-if="isAuthenticated" class="d-lg-block d-none" />',
         '<private-menu-desktop v-if="isAuthenticated" class="d-none d-lg-flex align-items-center flex-nowrap" />',
         1,
     )
-    if "i-educar-fav.svg" not in texto and "    <x-btn" in texto:
-        texto = texto.replace("    <x-btn", botao(" d-lg-none") + "    <x-btn", 1)
     if ".pmd-voltar {" not in texto:
         texto += "<style scoped>" + estilo + "</style>\n"
     barra.write_text(texto)
