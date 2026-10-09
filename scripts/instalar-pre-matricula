@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# Instala a pré-matrícula digital sem sudo.
+# Pacote: packages/serventec/pre-matricula-digital
+# Node e Yarn ficam em $HOME/node.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PKG_REL="packages/serventec/pre-matricula-digital"
+PKG="${ROOT}/${PKG_REL}"
+NODE_VERSION="v22.21.0"
+NODE_HOME="${NODE_HOME:-${HOME}/node}"
+YARN_VERSION="1.22.22"
+
+if [[ ! -f "${PKG}/package.json" ]]; then
+  echo "Pacote não encontrado em ${PKG_REL}." >&2
+  exit 1
+fi
+
+case "$(uname -m)" in
+  x86_64) NODE_ARCH="linux-x64" ;;
+  aarch64) NODE_ARCH="linux-arm64" ;;
+  *)
+    echo "Arquitetura $(uname -m) sem pacote oficial do Node previsto." >&2
+    exit 1
+    ;;
+esac
+
+mkdir -p "${NODE_HOME}"
+export PATH="${NODE_HOME}/bin:${PATH}"
+
+precisa_node=0
+if ! command -v node >/dev/null 2>&1; then
+  precisa_node=1
+else
+  maior="$(node -p "process.versions.node.split('.')[0]")"
+  if [[ "${maior}" -lt 22 ]]; then
+    precisa_node=1
+  fi
+fi
+
+if [[ "${precisa_node}" -eq 1 ]]; then
+  arquivo="${HOME}/node-${NODE_VERSION}-${NODE_ARCH}.tar.xz"
+  echo "Baixando Node ${NODE_VERSION} para ${NODE_HOME}."
+  curl -fsSL -o "${arquivo}" "https://nodejs.org/dist/${NODE_VERSION}/node-${NODE_VERSION}-${NODE_ARCH}.tar.xz"
+  tar -xJf "${arquivo}" -C "${NODE_HOME}" --strip-components=1
+fi
+
+linha='export PATH="$HOME/node/bin:$PATH"'
+touch "${HOME}/.bashrc"
+if ! grep -qxF "${linha}" "${HOME}/.bashrc"; then
+  printf '\n%s\n' "${linha}" >> "${HOME}/.bashrc"
+fi
+
+if ! command -v yarn >/dev/null 2>&1 || [[ "$(yarn --version 2>/dev/null || true)" != 1.* ]]; then
+  corepack enable --install-directory "${NODE_HOME}/bin"
+  corepack prepare "yarn@${YARN_VERSION}" --activate
+fi
+
+env_file="${ROOT}/.env"
+if [[ -f "${env_file}" ]]; then
+  grep -q '^FRONTIER_ENDPOINT=' "${env_file}" || printf '\nFRONTIER_ENDPOINT=/pre-matricula-digital\n' >> "${env_file}"
+  grep -q '^FRONTIER_VIEWS_PATH=' "${env_file}" || printf 'FRONTIER_VIEWS_PATH=%s/dist\n' "${PKG_REL}" >> "${env_file}"
+fi
+
+cd "${ROOT}"
+
+if [[ -f composer.phar ]]; then
+  php composer.phar plug-and-play
+else
+  composer plug-and-play
+fi
+
+yarn --cwd "${PKG_REL}" install
+yarn --cwd "${PKG_REL}" build --base=/vendor/pre-matricula-digital/
+
+php artisan migrate --force
+php artisan vendor:publish --tag=pmd --force
+php artisan optimize:clear
+
+echo "Pré-matrícula instalada a partir de ${PKG_REL}."
