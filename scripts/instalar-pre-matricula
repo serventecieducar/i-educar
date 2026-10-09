@@ -75,6 +75,7 @@ yarn --cwd "${PKG_REL}" build --base=/vendor/pre-matricula-digital/
 
 php artisan migrate --force
 php artisan vendor:publish --tag=pmd --force
+php artisan pmd:menu
 php artisan optimize:clear
 
 echo "Pré-matrícula instalada a partir de ${PKG_REL}."
