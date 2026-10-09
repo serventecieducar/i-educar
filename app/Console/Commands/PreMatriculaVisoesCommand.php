@@ -22,6 +22,7 @@ class PreMatriculaVisoesCommand extends Command
 
         foreach ([
             'pmd-school-years.sql',
+            'pmd-courses.sql',
             'pmd-grades.sql',
             'pmd-periods.sql',
             'pmd-classrooms.sql',
@@ -40,6 +41,7 @@ class PreMatriculaVisoesCommand extends Command
         DB::transaction(function () {
             foreach ([
                 'pmd-school-years.sql',
+                'pmd-courses.sql',
                 'pmd-grades.sql',
                 'pmd-periods.sql',
                 'pmd-classrooms.sql',
