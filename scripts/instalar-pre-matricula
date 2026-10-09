@@ -64,6 +64,11 @@ else
   composer plug-and-play
 fi
 
+schema="${PKG}/graphql/preregistration.graphql"
+if [[ -f "${schema}" ]]; then
+  sed -i '0,/extend type Query @guard(with: \["prematricula"\])/s//extend type Query @guard(with: ["web", "sanctum", "prematricula"])/' "${schema}"
+fi
+
 base_ts="${PKG}/resources/ts/router/base.ts"
 if [[ -f "${base_ts}" ]] && grep -q 'VITE_BASE_URL' "${base_ts}"; then
   cat > "${base_ts}" <<'EOF'
@@ -82,5 +87,6 @@ yarn --cwd "${PKG_REL}" build --base="${VITE_BASE}"
 php artisan migrate --force
 php artisan pmd:menu
 php artisan pmd:tela
+php artisan pmd:inscricoes
 
 echo "Pré-matrícula instalada a partir de ${PKG_REL}."
