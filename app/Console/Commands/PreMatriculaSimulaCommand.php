@@ -254,16 +254,40 @@ class PreMatriculaSimulaCommand extends Command
      */
     private function abrirAnoSeguinte(int $anoAtual, int $ano): array
     {
+        $existentes = collect(DB::select(
+            "select column_name from information_schema.columns where table_schema = 'pmieducar' and table_name = 'escola_ano_letivo'"
+        ))->pluck('column_name');
+
+        $ano = (int) $ano;
+        $anoAtual = (int) $anoAtual;
+        $campos = [
+            'ref_cod_escola' => 'turma.ref_ref_cod_escola',
+            'ano' => (string) $ano,
+            'ref_usuario_cad' => 'coalesce(atual.ref_usuario_cad, turma.ref_usuario_cad)',
+            'andamento' => '0',
+            'ativo' => '1',
+        ];
+
+        if ($existentes->contains('created_at')) {
+            $campos['created_at'] = 'now()';
+        } elseif ($existentes->contains('data_cadastro')) {
+            $campos['data_cadastro'] = 'now()';
+        }
+
+        if ($existentes->contains('updated_at')) {
+            $campos['updated_at'] = 'now()';
+        }
+
         $anos = DB::affectingStatement(
-            'insert into pmieducar.escola_ano_letivo (ref_cod_escola, ano, ref_usuario_cad, andamento, data_cadastro, ativo)
-             select distinct turma.ref_ref_cod_escola, ?, coalesce(atual.ref_usuario_cad, turma.ref_usuario_cad), 0, now(), 1
+            'insert into pmieducar.escola_ano_letivo (' . implode(', ', array_keys($campos)) . ')
+             select distinct ' . implode(', ', $campos) . '
              from pmieducar.turma turma
              join pmieducar.escola escola on escola.cod_escola = turma.ref_ref_cod_escola
              left join pmieducar.escola_ano_letivo atual
                on atual.ref_cod_escola = turma.ref_ref_cod_escola
-              and atual.ano = ?
+              and atual.ano = ' . $anoAtual . '
              where turma.ativo = 1
-               and turma.ano = ?
+               and turma.ano = ' . $anoAtual . '
                and turma.ref_ref_cod_escola is not null
                and escola.ativo = 1
                and escola.situacao_funcionamento = 1
@@ -271,9 +295,8 @@ class PreMatriculaSimulaCommand extends Command
                  select 1
                  from pmieducar.escola_ano_letivo ja
                  where ja.ref_cod_escola = turma.ref_ref_cod_escola
-                   and ja.ano = ?
-               )',
-            [$ano, $anoAtual, $anoAtual, $ano]
+                   and ja.ano = ' . $ano . '
+               )'
         );
 
         $turmas = $this->copiarTurmas($anoAtual, $ano, false) + $this->copiarTurmas($anoAtual, $ano, true);
