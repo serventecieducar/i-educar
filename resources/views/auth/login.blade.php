@@ -21,6 +21,7 @@
             <button id="form-login-submit" type="submit" class="submit">Entrar</button>
 
             @includeIf('prematricula::auth.login-button')
+            @includeIf('transporte-escolar::auth.login-button')
         </div>
 
         <div class="remember">

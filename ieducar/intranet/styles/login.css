@@ -86,13 +86,15 @@ button.submit:disabled {
 .login-actions {
   display: flex;
   align-items: stretch;
+  flex-wrap: wrap;
   gap: 10px;
   margin-top: 10px;
 }
 
 .login-actions .submit,
-.login-actions .pre-registration {
-  flex: 1 1 0;
+.login-actions .pre-registration,
+.login-actions .school-transport {
+  flex: 1 1 140px;
   margin: 0;
   min-height: 44px;
   box-sizing: border-box;
@@ -113,8 +115,15 @@ button.submit:disabled {
   padding: 12px 16px;
 }
 
-.login-actions .pre-registration .fa {
+.login-actions .pre-registration .fa,
+.login-actions .school-transport .fa {
   font-size: 16px;
+}
+
+.login-actions .school-transport {
+  background-color: #0f6b4c;
+  color: #fff;
+  text-decoration: none;
 }
 
 #footer {
