@@ -64,8 +64,20 @@ else
   composer plug-and-play
 fi
 
+base_ts="${PKG}/resources/ts/router/base.ts"
+if [[ -f "${base_ts}" ]] && grep -q 'VITE_BASE_URL' "${base_ts}"; then
+  cat > "${base_ts}" <<'EOF'
+const base = String(import.meta.env.VITE_ROUTER_BASE || '/pre-matricula-digital');
+
+export default base;
+EOF
+fi
+
+export VITE_BASE="${VITE_BASE:-/vendor/pre-matricula-digital/}"
+export VITE_ROUTER_BASE="${VITE_ROUTER_BASE:-/pre-matricula-digital}"
+
 yarn --cwd "${PKG_REL}" install
-yarn --cwd "${PKG_REL}" build --base=/vendor/pre-matricula-digital/
+yarn --cwd "${PKG_REL}" build --base="${VITE_BASE}"
 
 php artisan migrate --force
 php artisan pmd:menu
