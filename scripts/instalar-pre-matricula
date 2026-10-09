@@ -56,12 +56,6 @@ if ! command -v yarn >/dev/null 2>&1 || [[ "$(yarn --version 2>/dev/null || true
   corepack prepare "yarn@${YARN_VERSION}" --activate
 fi
 
-env_file="${ROOT}/.env"
-if [[ -f "${env_file}" ]]; then
-  grep -q '^FRONTIER_ENDPOINT=' "${env_file}" || printf '\nFRONTIER_ENDPOINT=/pre-matricula-digital\n' >> "${env_file}"
-  grep -q '^FRONTIER_VIEWS_PATH=' "${env_file}" || printf 'FRONTIER_VIEWS_PATH=%s/dist\n' "${PKG_REL}" >> "${env_file}"
-fi
-
 cd "${ROOT}"
 
 if [[ -f composer.phar ]]; then
@@ -74,8 +68,7 @@ yarn --cwd "${PKG_REL}" install
 yarn --cwd "${PKG_REL}" build --base=/vendor/pre-matricula-digital/
 
 php artisan migrate --force
-php artisan vendor:publish --tag=pmd --force
 php artisan pmd:menu
-php artisan optimize:clear
+php artisan pmd:tela
 
 echo "Pré-matrícula instalada a partir de ${PKG_REL}."
