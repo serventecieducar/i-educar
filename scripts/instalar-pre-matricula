@@ -64,9 +64,26 @@ else
   composer plug-and-play
 fi
 
-schema="${PKG}/graphql/preregistration.graphql"
-if [[ -f "${schema}" ]]; then
-  sed -i '0,/extend type Query @guard(with: \["prematricula"\])/s//extend type Query @guard(with: ["web", "sanctum", "prematricula"])/' "${schema}"
+if [[ -d "${PKG}/graphql" ]]; then
+  find "${PKG}/graphql" -name '*.graphql' -print0 | xargs -0 sed -i 's/@guard(with: \["prematricula"\])/@guard(with: ["web", "sanctum", "prematricula"])/g'
+fi
+
+loader="${PKG}/resources/ts/composables/useLoader.ts"
+if [[ -f "${loader}" ]] && ! grep -q 'reject(error)' "${loader}"; then
+  python3 - "${loader}" <<'PY'
+from pathlib import Path
+import sys
+caminho = Path(sys.argv[1])
+texto = caminho.read_text()
+antigo = """          errors.value = error;
+        })"""
+novo = """          errors.value = error;
+          reject(error);
+        })"""
+if antigo not in texto:
+    raise SystemExit("Não foi possível encerrar o carregamento quando a consulta falha.")
+caminho.write_text(texto.replace(antigo, novo, 1))
+PY
 fi
 
 base_ts="${PKG}/resources/ts/router/base.ts"
@@ -273,6 +290,7 @@ yarn --cwd "${PKG_REL}" install
 yarn --cwd "${PKG_REL}" build --base="${VITE_BASE}"
 
 php artisan migrate --force
+php artisan pmd:visoes
 php artisan pmd:menu
 php artisan pmd:tela
 php artisan pmd:inscricoes

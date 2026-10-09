@@ -6,33 +6,44 @@ use Illuminate\Console\Command;
 
 class PreMatriculaInscricoesCommand extends Command
 {
-    private const SCHEMA = 'packages/serventec/pre-matricula-digital/graphql/preregistration.graphql';
-
     protected $signature = 'pmd:inscricoes';
 
     protected $description = 'Libera a lista de inscrições para quem já está logado no i-Educar';
 
     public function handle(): int
     {
-        $arquivo = base_path(self::SCHEMA);
+        $pastas = [
+            base_path('packages/serventec/pre-matricula-digital/graphql'),
+            base_path('packages/portabilis/pre-matricula-digital/graphql'),
+        ];
+        $alterou = false;
 
-        if (!is_file($arquivo)) {
-            $this->error('Schema não encontrado em ' . self::SCHEMA . '.');
+        foreach ($pastas as $pasta) {
+            if (!is_dir($pasta)) {
+                continue;
+            }
 
-            return self::FAILURE;
+            foreach (glob($pasta . '/*.graphql') ?: [] as $arquivo) {
+                $conteudo = (string) file_get_contents($arquivo);
+                $novo = str_replace(
+                    '@guard(with: ["prematricula"])',
+                    '@guard(with: ["web", "sanctum", "prematricula"])',
+                    $conteudo
+                );
+
+                if ($novo === $conteudo) {
+                    continue;
+                }
+
+                file_put_contents($arquivo, $novo);
+                $alterou = true;
+            }
         }
 
-        $conteudo = (string) file_get_contents($arquivo);
-        $antigo = 'extend type Query @guard(with: ["prematricula"]) {';
-        $novo = 'extend type Query @guard(with: ["web", "sanctum", "prematricula"]) {';
-        $posicao = strpos($conteudo, $antigo);
-
-        if ($posicao !== false) {
-            $conteudo = substr_replace($conteudo, $novo, $posicao, strlen($antigo));
-            file_put_contents($arquivo, $conteudo);
-            $this->info('A lista de inscrições aceita a sessão do i-Educar.');
+        if ($alterou) {
+            $this->info('As consultas da pré-matrícula aceitam a sessão do i-Educar.');
         } else {
-            $this->info('A lista de inscrições já aceita a sessão do i-Educar.');
+            $this->info('As consultas da pré-matrícula já aceitam a sessão do i-Educar.');
         }
 
         $this->callSilent('optimize:clear');

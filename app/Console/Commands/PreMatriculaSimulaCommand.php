@@ -49,7 +49,7 @@ class PreMatriculaSimulaCommand extends Command
         }
 
         $criados = $this->abrirAnoSeguinte($anoAtual, $ano);
-        $this->atualizarVisaoTurmas();
+        $this->marcarSeriesDaPreMatricula($ano);
 
         $series = $this->seriesDoAno($ano);
         $turnos = DB::table('pmieducar.turma')
@@ -182,8 +182,14 @@ class PreMatriculaSimulaCommand extends Command
                 }
             }
 
+            $this->completarProcesso((int) $processoId);
+
             return $processoId;
         });
+
+        if ($this->call('pmd:visoes') !== self::SUCCESS) {
+            return self::FAILURE;
+        }
 
         $vagas = 0;
         if ($this->relacaoExiste('process_vacancy')) {
@@ -412,15 +418,105 @@ class PreMatriculaSimulaCommand extends Command
         return $normais->merge($multisseriadas)->unique()->values();
     }
 
-    private function atualizarVisaoTurmas(): void
+    private function marcarSeriesDaPreMatricula(int $ano): void
     {
-        $arquivo = base_path('database/sqls/pmd-classrooms.sql');
-
-        if (!is_file($arquivo)) {
-            return;
+        if ($this->colunaExiste('pmieducar.serie', 'importar_serie_pre_matricula')) {
+            DB::statement(
+                'update pmieducar.serie serie
+                 set importar_serie_pre_matricula = true
+                 where serie.ativo = 1
+                   and (
+                     exists (
+                       select 1 from pmieducar.turma turma
+                       where turma.ativo = 1 and turma.ano = ? and turma.ref_ref_cod_serie = serie.cod_serie
+                     )
+                     or exists (
+                       select 1 from pmieducar.turma turma
+                       join pmieducar.turma_serie turma_serie on turma_serie.turma_id = turma.cod_turma
+                       where turma.ativo = 1 and turma.ano = ? and turma_serie.serie_id = serie.cod_serie
+                     )
+                   )',
+                [$ano, $ano]
+            );
         }
 
-        DB::unprepared((string) file_get_contents($arquivo));
+        if ($this->colunaExiste('pmieducar.escola_serie', 'anos_letivos')) {
+            DB::statement(
+                'update pmieducar.escola_serie escola_serie
+                 set anos_letivos = escola_serie.anos_letivos || ?::smallint
+                 where escola_serie.ativo = 1
+                   and not (escola_serie.anos_letivos @> array[?]::smallint[])
+                   and exists (
+                     select 1 from pmieducar.turma turma
+                     where turma.ativo = 1
+                       and turma.ano = ?
+                       and turma.ref_ref_cod_escola = escola_serie.ref_cod_escola
+                       and turma.ref_ref_cod_serie = escola_serie.ref_cod_serie
+                   )',
+                [$ano, $ano, $ano]
+            );
+        }
+
+        if ($this->colunaExiste('pmieducar.escola_curso', 'anos_letivos')) {
+            DB::statement(
+                'update pmieducar.escola_curso escola_curso
+                 set anos_letivos = escola_curso.anos_letivos || ?::smallint
+                 where not (escola_curso.anos_letivos @> array[?]::smallint[])
+                   and exists (
+                     select 1
+                     from pmieducar.turma turma
+                     join pmieducar.serie serie on serie.cod_serie = turma.ref_ref_cod_serie
+                     where turma.ativo = 1
+                       and turma.ano = ?
+                       and turma.ref_ref_cod_escola = escola_curso.ref_cod_escola
+                       and serie.ref_cod_curso = escola_curso.ref_cod_curso
+                   )',
+                [$ano, $ano, $ano]
+            );
+        }
+    }
+
+    private function completarProcesso(int $processoId): void
+    {
+        $existentes = collect(DB::select(
+            "select column_name from information_schema.columns where table_schema = 'public' and table_name = 'processes'"
+        ))->pluck('column_name');
+
+        $valores = [
+            'force_suggested_grade' => false,
+            'show_priority_protocol' => false,
+            'allow_responsible_select_map_address' => false,
+            'block_incompatible_age_group' => false,
+            'auto_reject_by_days' => false,
+            'selected_schools' => false,
+            'waiting_list_limit' => 0,
+            'one_per_year' => false,
+            'show_waiting_list' => true,
+            'reject_type_id' => 0,
+            'priority_custom' => false,
+            'active' => true,
+        ];
+
+        $gravar = [];
+        foreach ($valores as $coluna => $valor) {
+            if ($existentes->contains($coluna)) {
+                $gravar[$coluna] = $valor;
+            }
+        }
+
+        if ($gravar !== []) {
+            DB::table('processes')->where('id', $processoId)->update($gravar);
+        }
+    }
+
+    private function colunaExiste(string $tabela, string $coluna): bool
+    {
+        [$esquema, $nome] = explode('.', $tabela);
+
+        return collect(DB::select(
+            'select 1 from information_schema.columns where table_schema = ? and table_name = ? and column_name = ?',
+            [$esquema, $nome, $coluna]
+        ))->isNotEmpty();
     }
 
     private function relacaoExiste(string $nome): bool
