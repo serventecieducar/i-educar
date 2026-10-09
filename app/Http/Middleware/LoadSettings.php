@@ -20,7 +20,7 @@ class LoadSettings
     {
         $config = CacheService::rememberGeneralConfiguration(
             fn () => (array) DB::table('pmieducar.configuracoes_gerais as cg')
-                ->select('cg.*')
+                ->select('cg.*', 'i.cidade', 'i.ref_sigla_uf')
                 ->join('pmieducar.instituicao as i', 'cod_instituicao', '=', 'ref_cod_instituicao')
                 ->where('i.ativo', 1)
                 ->first()
@@ -62,7 +62,32 @@ class LoadSettings
         Config::set($settings);
         Config::set($this->getConfig());
         Config::set($this->getDatabaseConfig());
+        $this->applyInstitutionToPreMatricula();
 
         return $next($request);
+    }
+
+    /**
+     * A pré-matrícula traz Içara/SC como valor de fábrica. A cidade exibida
+     * segue a instituição ativa desta instalação.
+     */
+    private function applyInstitutionToPreMatricula(): void
+    {
+        $institution = config('legacy.config');
+
+        if (!is_object($institution) && !is_array($institution)) {
+            return;
+        }
+
+        $city = data_get($institution, 'cidade');
+        $state = data_get($institution, 'ref_sigla_uf');
+
+        if (filled($city)) {
+            Config::set('prematricula.city', $city);
+        }
+
+        if (filled($state)) {
+            Config::set('prematricula.state', $state);
+        }
     }
 }

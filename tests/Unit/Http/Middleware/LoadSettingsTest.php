@@ -5,6 +5,8 @@ namespace Tests\Unit\Http\Middleware;
 use App\Events\SystemSettingsUpdatedEvent;
 use App\Http\Middleware\LoadSettings;
 use App\Setting;
+use Database\Factories\LegacyGeneralConfigurationFactory;
+use Database\Factories\LegacyInstitutionFactory;
 use Database\Factories\SettingFactory;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\Request;
@@ -86,5 +88,32 @@ class LoadSettingsTest extends TestCase
         $this->handle();
 
         $this->assertEquals('novo', Config::get('load.settings.invalidation'));
+    }
+
+    public function test_pre_matricula_uses_the_active_institution_city(): void
+    {
+        DB::table('pmieducar.instituicao')->update(['ativo' => 0]);
+
+        $institution = LegacyInstitutionFactory::new()->create([
+            'cidade' => 'Caxias do Sul',
+            'ref_sigla_uf' => 'RS',
+            'ativo' => 1,
+        ]);
+        LegacyGeneralConfigurationFactory::new()->create([
+            'ref_cod_instituicao' => $institution->getKey(),
+        ]);
+        Setting::query()->updateOrCreate(
+            ['key' => 'prematricula.city'],
+            ['value' => 'Içara', 'type' => Setting::TYPE_STRING, 'description' => 'Município']
+        );
+        Setting::query()->updateOrCreate(
+            ['key' => 'prematricula.state'],
+            ['value' => 'SC', 'type' => Setting::TYPE_STRING, 'description' => 'UF']
+        );
+
+        $this->handle();
+
+        $this->assertSame('Caxias do Sul', Config::get('prematricula.city'));
+        $this->assertSame('RS', Config::get('prematricula.state'));
     }
 }
