@@ -34,20 +34,26 @@ class PreMatriculaSimulaCommand extends Command
             }
         }
 
-        $ano = $this->option('ano') ? (int) $this->option('ano') : null;
-        $ano = $ano ?: DB::table('classrooms')->max('school_year_id');
+        $ano = $this->anoVigente();
 
         if (!$ano) {
-            $this->error('Não há turmas com ano letivo para montar as vagas.');
+            $this->error('Não há turmas ativas nem ano letivo em andamento para montar as vagas.');
 
             return self::FAILURE;
         }
 
-        $series = DB::table('classrooms')->where('school_year_id', $ano)->distinct()->pluck('grade_id');
-        $turnos = DB::table('classrooms')->where('school_year_id', $ano)->distinct()->pluck('period_id');
+        $this->atualizarVisaoTurmas();
+
+        $series = $this->seriesDoAno($ano);
+        $turnos = DB::table('pmieducar.turma')
+            ->where('ativo', 1)
+            ->where('ano', $ano)
+            ->whereNotNull('turma_turno_id')
+            ->distinct()
+            ->pluck('turma_turno_id');
 
         if ($series->isEmpty() || $turnos->isEmpty()) {
-            $this->error('O ano ' . $ano . ' não tem série e turno nas turmas.');
+            $this->error('O ano ' . $ano . ' não tem turma ativa com série e turno. A turma precisa estar ativa, no ano vigente, com série e turno preenchidos.');
 
             return self::FAILURE;
         }
@@ -186,6 +192,66 @@ class PreMatriculaSimulaCommand extends Command
         $this->line('Lista: /pre-matricula-digital/inscricoes');
 
         return self::SUCCESS;
+    }
+
+    private function anoVigente(): ?int
+    {
+        if ($this->option('ano')) {
+            return (int) $this->option('ano');
+        }
+
+        $emAndamento = DB::table('pmieducar.escola_ano_letivo')
+            ->where('andamento', 1)
+            ->where('ativo', 1)
+            ->max('ano');
+
+        if ($emAndamento) {
+            $this->line('Ano vigente em andamento: ' . $emAndamento);
+
+            return (int) $emAndamento;
+        }
+
+        $anoTurma = DB::table('pmieducar.turma')->where('ativo', 1)->max('ano');
+
+        if ($anoTurma) {
+            $this->line('Ano vigente pelas turmas ativas: ' . $anoTurma);
+
+            return (int) $anoTurma;
+        }
+
+        return null;
+    }
+
+    private function seriesDoAno(int $ano)
+    {
+        $normais = DB::table('pmieducar.turma')
+            ->where('ativo', 1)
+            ->where('ano', $ano)
+            ->where('multiseriada', 0)
+            ->whereNotNull('ref_ref_cod_serie')
+            ->distinct()
+            ->pluck('ref_ref_cod_serie');
+
+        $multisseriadas = DB::table('pmieducar.turma as turma')
+            ->join('pmieducar.turma_serie', 'turma_serie.turma_id', '=', 'turma.cod_turma')
+            ->where('turma.ativo', 1)
+            ->where('turma.ano', $ano)
+            ->where('turma.multiseriada', 1)
+            ->distinct()
+            ->pluck('turma_serie.serie_id');
+
+        return $normais->merge($multisseriadas)->unique()->values();
+    }
+
+    private function atualizarVisaoTurmas(): void
+    {
+        $arquivo = base_path('database/sqls/pmd-classrooms.sql');
+
+        if (!is_file($arquivo)) {
+            return;
+        }
+
+        DB::unprepared((string) file_get_contents($arquivo));
     }
 
     private function relacaoExiste(string $nome): bool
