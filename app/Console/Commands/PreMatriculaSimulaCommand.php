@@ -9,7 +9,7 @@ class PreMatriculaSimulaCommand extends Command
 {
     protected $signature = 'pmd:simula {--ano=} {--database=}';
 
-    protected $description = 'Cria um processo de pré-matrícula aberto, com séries, turnos e vagas das turmas já existentes';
+    protected $description = 'Cria um processo de pré-matrícula no ano letivo seguinte, sem alterar o ano em andamento';
 
     public function __construct()
     {
@@ -34,14 +34,21 @@ class PreMatriculaSimulaCommand extends Command
             }
         }
 
-        $ano = $this->anoVigente();
+        $anoAtual = $this->anoVigente();
 
-        if (!$ano) {
-            $this->error('Não há turmas ativas nem ano letivo em andamento para montar as vagas.');
+        if (!$anoAtual) {
+            $this->error('Não há turmas ativas nem ano letivo em andamento para copiar ao ano seguinte.');
 
             return self::FAILURE;
         }
 
+        $ano = $this->anoDaPreMatricula($anoAtual);
+
+        if (!$ano) {
+            return self::FAILURE;
+        }
+
+        $criados = $this->abrirAnoSeguinte($anoAtual, $ano);
         $this->atualizarVisaoTurmas();
 
         $series = $this->seriesDoAno($ano);
@@ -53,7 +60,7 @@ class PreMatriculaSimulaCommand extends Command
             ->pluck('turma_turno_id');
 
         if ($series->isEmpty() || $turnos->isEmpty()) {
-            $this->error('O ano ' . $ano . ' não tem turma ativa com série e turno. A turma precisa estar ativa, no ano vigente, com série e turno preenchidos.');
+            $this->error('O ano ' . $ano . ' não ficou com turma ativa, série ativa, curso ativo e turno. A escola também precisa estar ativa e em atividade.');
 
             return self::FAILURE;
         }
@@ -184,7 +191,10 @@ class PreMatriculaSimulaCommand extends Command
         }
 
         $this->info('Processo ' . $processoId . ': ' . $nome);
-        $this->line('Ano: ' . $ano);
+        $this->line('Ano em andamento, sem alteração: ' . $anoAtual);
+        $this->line('Ano da pré-matrícula: ' . $ano);
+        $this->line('Anos letivos criados: ' . $criados['anos']);
+        $this->line('Turmas copiadas: ' . $criados['turmas']);
         $this->line('Séries: ' . $series->count());
         $this->line('Turnos: ' . $turnos->count());
         $this->line('Vagas nas turmas: ' . $vagas);
@@ -220,6 +230,142 @@ class PreMatriculaSimulaCommand extends Command
         }
 
         return null;
+    }
+
+    private function anoDaPreMatricula(int $anoAtual): ?int
+    {
+        if ($this->option('ano')) {
+            $ano = (int) $this->option('ano');
+
+            if ($ano <= $anoAtual) {
+                $this->error('O ano da pré-matrícula precisa ser posterior a ' . $anoAtual . '. O ano em andamento permanece como está.');
+
+                return null;
+            }
+
+            return $ano;
+        }
+
+        return $anoAtual + 1;
+    }
+
+    /**
+     * @return array{anos: int, turmas: int}
+     */
+    private function abrirAnoSeguinte(int $anoAtual, int $ano): array
+    {
+        $anos = DB::affectingStatement(
+            'insert into pmieducar.escola_ano_letivo (ref_cod_escola, ano, ref_usuario_cad, andamento, data_cadastro, ativo)
+             select distinct turma.ref_ref_cod_escola, ?, coalesce(atual.ref_usuario_cad, turma.ref_usuario_cad), 0, now(), 1
+             from pmieducar.turma turma
+             join pmieducar.escola escola on escola.cod_escola = turma.ref_ref_cod_escola
+             left join pmieducar.escola_ano_letivo atual
+               on atual.ref_cod_escola = turma.ref_ref_cod_escola
+              and atual.ano = ?
+             where turma.ativo = 1
+               and turma.ano = ?
+               and turma.ref_ref_cod_escola is not null
+               and escola.ativo = 1
+               and escola.situacao_funcionamento = 1
+               and not exists (
+                 select 1
+                 from pmieducar.escola_ano_letivo ja
+                 where ja.ref_cod_escola = turma.ref_ref_cod_escola
+                   and ja.ano = ?
+               )',
+            [$ano, $anoAtual, $anoAtual, $ano]
+        );
+
+        $turmas = $this->copiarTurmas($anoAtual, $ano, false) + $this->copiarTurmas($anoAtual, $ano, true);
+        $this->copiarSeriesDaTurma($anoAtual, $ano);
+
+        return ['anos' => $anos, 'turmas' => $turmas];
+    }
+
+    private function copiarTurmas(int $anoAtual, int $ano, bool $multisseriada): int
+    {
+        $colunas = collect(DB::select(
+            "select column_name from information_schema.columns where table_schema = 'pmieducar' and table_name = 'turma' and column_name <> 'cod_turma' order by ordinal_position"
+        ))->pluck('column_name');
+
+        $nomes = $colunas->map(fn ($coluna) => '"' . $coluna . '"')->implode(', ');
+        $origem = $colunas->map(function ($coluna) use ($ano) {
+            return match ($coluna) {
+                'ano' => $ano . ' as ano',
+                'data_cadastro' => 'now() as data_cadastro',
+                'data_exclusao' => 'null::timestamp as data_exclusao',
+                'ref_usuario_exc' => 'null::integer as ref_usuario_exc',
+                'ativo' => '1 as ativo',
+                default => 'origem."' . $coluna . '"',
+            };
+        })->implode(', ');
+
+        $serie = $multisseriada
+            ? 'join pmieducar.turma_serie turma_serie on turma_serie.turma_id = origem.cod_turma
+               join pmieducar.serie serie on serie.cod_serie = turma_serie.serie_id'
+            : 'join pmieducar.serie serie on serie.cod_serie = origem.ref_ref_cod_serie';
+
+        $filtroSerie = $multisseriada
+            ? 'and origem.multiseriada = 1'
+            : 'and origem.multiseriada = 0 and origem.ref_ref_cod_serie is not null';
+
+        return DB::affectingStatement(
+            "insert into pmieducar.turma ($nomes)
+             select distinct on (origem.cod_turma) $origem
+             from pmieducar.turma origem
+             join pmieducar.escola escola on escola.cod_escola = origem.ref_ref_cod_escola
+             $serie
+             join pmieducar.curso curso on curso.cod_curso = serie.ref_cod_curso
+             where origem.ativo = 1
+               and origem.ano = ?
+               and origem.turma_turno_id is not null
+               $filtroSerie
+               and escola.ativo = 1
+               and escola.situacao_funcionamento = 1
+               and serie.ativo = 1
+               and curso.ativo = 1
+               and not exists (
+                 select 1
+                 from pmieducar.turma ja
+                 where ja.ano = ?
+                   and ja.ativo = 1
+                   and ja.ref_ref_cod_escola = origem.ref_ref_cod_escola
+                   and ja.nm_turma = origem.nm_turma
+                   and ja.turma_turno_id = origem.turma_turno_id
+               )
+             order by origem.cod_turma",
+            [$anoAtual, $ano]
+        );
+    }
+
+    private function copiarSeriesDaTurma(int $anoAtual, int $ano): void
+    {
+        if (!$this->relacaoExiste('pmieducar.turma_serie')) {
+            return;
+        }
+
+        DB::affectingStatement(
+            'insert into pmieducar.turma_serie (escola_id, serie_id, turma_id, boletim_id, boletim_diferenciado_id, created_at, updated_at)
+             select origem_serie.escola_id, origem_serie.serie_id, destino.cod_turma, origem_serie.boletim_id, origem_serie.boletim_diferenciado_id, now(), now()
+             from pmieducar.turma origem
+             join pmieducar.turma_serie origem_serie on origem_serie.turma_id = origem.cod_turma
+             join pmieducar.turma destino
+               on destino.ano = ?
+              and destino.ativo = 1
+              and destino.ref_ref_cod_escola = origem.ref_ref_cod_escola
+              and destino.nm_turma = origem.nm_turma
+              and destino.turma_turno_id = origem.turma_turno_id
+             where origem.ano = ?
+               and origem.multiseriada = 1
+               and origem.ativo = 1
+               and not exists (
+                 select 1
+                 from pmieducar.turma_serie ja
+                 where ja.turma_id = destino.cod_turma
+                   and ja.serie_id = origem_serie.serie_id
+               )',
+            [$ano, $anoAtual]
+        );
     }
 
     private function seriesDoAno(int $ano)
