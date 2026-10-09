@@ -120,10 +120,18 @@ button.submit:disabled {
   font-size: 16px;
 }
 
-.login-actions .school-transport {
-  background-color: #0f6b4c;
-  color: #fff;
+.login-actions a.school-transport {
+  background-color: #1f4e66 !important;
+  border: 0;
+  color: #fff !important;
+  font-weight: 700;
   text-decoration: none;
+}
+
+.login-actions a.school-transport:hover,
+.login-actions a.school-transport:focus {
+  background-color: #16384a !important;
+  color: #fff !important;
 }
 
 #footer {
