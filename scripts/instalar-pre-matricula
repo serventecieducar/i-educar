@@ -123,110 +123,97 @@ EOF
 fi
 
 menu_desktop="${PKG}/resources/ts/components/elements/PrivateMenuDesktop.vue"
-if [[ -f "${menu_desktop}" ]] && ! grep -q 'class="pmd-voltar"' "${menu_desktop}"; then
-  python3 - "${menu_desktop}" <<'PY'
-from pathlib import Path
+navbar="${PKG}/resources/ts/components/elements/Navbar.vue"
+python3 - "${menu_desktop}" "${navbar}" <<'PY'
+import re
 import sys
-caminho = Path(sys.argv[1])
-texto = caminho.read_text()
-antigo = """    <span class="pr-3 float-left authenticated_user" @mouseenter="show = true">
-      {{ getAuthenticatedUser?.name }}
-    </span>
-    <x-btn"""
-novo = """    <span class="authenticated_user" @mouseenter="show = true">
-      {{ getAuthenticatedUser?.name }}
-    </span>
-    <a href="/intranet/index.php" class="pmd-voltar">Voltar ao i-Educar</a>
-    <x-btn"""
-if antigo not in texto:
-    raise SystemExit("Não foi possível colocar o retorno ao lado do menu da pré-matrícula.")
-texto = texto.replace(antigo, novo, 1)
-texto = texto.replace(
-    'class="pr-0 pr-lg-4 position-relative"\n    style="height: 53px"',
-    'class="pmd-menu-logado pr-0 pr-lg-4 position-relative"',
-    1,
-)
-if ".pmd-menu-logado {" not in texto:
-    texto += """
+from pathlib import Path
+
+def botao(extra=""):
+    classe = "pmd-voltar bg-white border-primary-light" + extra
+    return f"""    <a
+      href="/intranet/index.php"
+      class="{classe}"
+      title="Voltar ao i-Educar"
+      aria-label="Voltar ao i-Educar"
+    >
+      <img src="/svg/i-educar-fav.svg" alt="">
+    </a>
+"""
+
+estilo = """
+.pmd-voltar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border-radius: 3px;
+  line-height: 0;
+  text-decoration: none;
+}
+.pmd-voltar img {
+  width: 28px;
+  height: 28px;
+}
+"""
+
+def sem_botao_antigo(texto: str) -> str:
+    texto = re.sub(
+        r'\s*<a[^>]*class="pmd-voltar"[^>]*>[\s\S]*?</a>\s*',
+        "\n",
+        texto,
+        count=1,
+    )
+    texto = re.sub(r"\n<style[\s\S]*?\.pmd-voltar \{[\s\S]*?</style>\s*$", "\n", texto)
+    return texto
+
+menu = Path(sys.argv[1])
+if menu.is_file():
+    texto = sem_botao_antigo(menu.read_text())
+    if "i-educar-fav.svg" not in texto:
+        texto = texto.replace("    <x-btn", botao() + "    <x-btn", 1)
+    texto = texto.replace(
+        'class="pr-0 pr-lg-4 position-relative"\n    style="height: 53px"',
+        'class="pmd-menu-logado pr-0 pr-lg-4 position-relative"',
+        1,
+    )
+    texto = texto.replace('class="pr-3 float-left authenticated_user"', 'class="authenticated_user"', 1)
+    texto = texto.replace('<div class="pt-3">', '<div class="pmd-menu-lista">', 1)
+    if ".pmd-menu-logado {" not in texto:
+        texto += """
 <style lang="scss" scoped>
 .pmd-menu-logado {
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;
   height: 53px;
   gap: 12px;
 }
-.pmd-voltar {
-  padding: 8px 14px;
-  border-radius: 3px;
-  background: #1f4e66;
-  color: #fff;
-  font-weight: 700;
-  font-size: 14px;
-  line-height: 1;
-  text-decoration: none;
-  white-space: nowrap;
+.pmd-menu-lista {
+  position: absolute;
+  top: 100%;
+  right: 1.5em;
 }
-.pmd-voltar:hover,
-.pmd-voltar:focus {
-  background: #16384a;
-  color: #fff;
-  text-decoration: none;
-}
-</style>
-"""
-caminho.write_text(texto)
-PY
-fi
+""" + estilo + "</style>\n"
+    menu.write_text(texto)
 
-navbar="${PKG}/resources/ts/components/elements/Navbar.vue"
-if [[ -f "${navbar}" ]] && ! grep -q 'class="pmd-voltar"' "${navbar}"; then
-  python3 - "${navbar}" <<'PY'
-from pathlib import Path
-import sys
-caminho = Path(sys.argv[1])
-texto = caminho.read_text()
-botao = """    <a href="/intranet/index.php" class="pmd-voltar">Voltar ao i-Educar</a>
-"""
-antigo = """    <a
-      href="/intranet/index.php"
-      class="nav-link text-primary font-weight-bold text-nowrap ml-lg-auto mr-2"
-    >
-      Voltar ao i-Educar
-    </a>
-"""
-if antigo in texto:
-    texto = texto.replace(antigo, botao, 1)
-elif "    </router-link>\n" in texto:
-    texto = texto.replace("    </router-link>\n", "    </router-link>\n" + botao, 1)
-else:
-    raise SystemExit("Não foi possível incluir o retorno ao i-Educar no cabeçalho.")
-if ".pmd-voltar {" not in texto:
-    texto += """
-<style scoped>
-.pmd-voltar {
-  margin-left: auto;
-  margin-right: 12px;
-  padding: 8px 14px;
-  border-radius: 3px;
-  background: #1f4e66;
-  color: #fff;
-  font-weight: 700;
-  font-size: 14px;
-  line-height: 1;
-  text-decoration: none;
-  white-space: nowrap;
-}
-.pmd-voltar:hover,
-.pmd-voltar:focus {
-  background: #16384a;
-  color: #fff;
-  text-decoration: none;
-}
-</style>
-"""
-caminho.write_text(texto)
+barra = Path(sys.argv[2])
+if barra.is_file():
+    texto = sem_botao_antigo(barra.read_text())
+    texto = texto.replace(
+        '<private-menu-desktop v-if="isAuthenticated" class="d-lg-block d-none" />',
+        '<private-menu-desktop v-if="isAuthenticated" class="d-none d-lg-flex align-items-center flex-nowrap" />',
+        1,
+    )
+    if "i-educar-fav.svg" not in texto and "    <x-btn" in texto:
+        texto = texto.replace("    <x-btn", botao(" d-lg-none") + "    <x-btn", 1)
+    if ".pmd-voltar {" not in texto:
+        texto += "<style scoped>" + estilo + "</style>\n"
+    barra.write_text(texto)
 PY
-fi
 
 lista="${PKG}/resources/ts/modules/preregistration/components/PreRegistrationList.vue"
 if [[ -f "${lista}" ]] && grep -q 'reactiveRoute' "${lista}"; then
