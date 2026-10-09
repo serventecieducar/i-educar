@@ -78,6 +78,207 @@ export default base;
 EOF
 fi
 
+campo="${PKG}/resources/ts/components/form/InputFroala.vue"
+if [[ -f "${campo}" ]]; then
+  cat > "${campo}" <<'EOF'
+<template>
+  <textarea
+    v-model="texto"
+    class="form-control"
+    rows="8"
+    :name="name"
+    :placeholder="placeholder"
+    :disabled="disabled"
+  />
+</template>
+
+<script setup lang="ts">
+import { ModelValue } from '@/types';
+import { computed } from 'vue';
+
+const props = withDefaults(
+  defineProps<{
+    data?: ModelValue;
+    placeholder?: string;
+    name: string;
+    disabled?: boolean;
+  }>(),
+  {
+    data: null,
+    placeholder: 'Adicione sua mensagem aqui',
+    disabled: false,
+  }
+);
+
+const emit = defineEmits<{
+  (event: 'update:data', value: ModelValue): void;
+}>();
+
+const texto = computed({
+  get: () => (props.data == null ? '' : String(props.data)),
+  set: (valor: string) => emit('update:data', valor),
+});
+</script>
+EOF
+fi
+
+menu_desktop="${PKG}/resources/ts/components/elements/PrivateMenuDesktop.vue"
+if [[ -f "${menu_desktop}" ]] && ! grep -q 'class="pmd-voltar"' "${menu_desktop}"; then
+  python3 - "${menu_desktop}" <<'PY'
+from pathlib import Path
+import sys
+caminho = Path(sys.argv[1])
+texto = caminho.read_text()
+antigo = """    <span class="pr-3 float-left authenticated_user" @mouseenter="show = true">
+      {{ getAuthenticatedUser?.name }}
+    </span>
+    <x-btn"""
+novo = """    <span class="authenticated_user" @mouseenter="show = true">
+      {{ getAuthenticatedUser?.name }}
+    </span>
+    <a href="/intranet/index.php" class="pmd-voltar">Voltar ao i-Educar</a>
+    <x-btn"""
+if antigo not in texto:
+    raise SystemExit("Não foi possível colocar o retorno ao lado do menu da pré-matrícula.")
+texto = texto.replace(antigo, novo, 1)
+texto = texto.replace(
+    'class="pr-0 pr-lg-4 position-relative"\n    style="height: 53px"',
+    'class="pmd-menu-logado pr-0 pr-lg-4 position-relative"',
+    1,
+)
+if ".pmd-menu-logado {" not in texto:
+    texto += """
+<style lang="scss" scoped>
+.pmd-menu-logado {
+  display: flex;
+  align-items: center;
+  height: 53px;
+  gap: 12px;
+}
+.pmd-voltar {
+  padding: 8px 14px;
+  border-radius: 3px;
+  background: #1f4e66;
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.pmd-voltar:hover,
+.pmd-voltar:focus {
+  background: #16384a;
+  color: #fff;
+  text-decoration: none;
+}
+</style>
+"""
+caminho.write_text(texto)
+PY
+fi
+
+navbar="${PKG}/resources/ts/components/elements/Navbar.vue"
+if [[ -f "${navbar}" ]] && ! grep -q 'class="pmd-voltar"' "${navbar}"; then
+  python3 - "${navbar}" <<'PY'
+from pathlib import Path
+import sys
+caminho = Path(sys.argv[1])
+texto = caminho.read_text()
+botao = """    <a href="/intranet/index.php" class="pmd-voltar">Voltar ao i-Educar</a>
+"""
+antigo = """    <a
+      href="/intranet/index.php"
+      class="nav-link text-primary font-weight-bold text-nowrap ml-lg-auto mr-2"
+    >
+      Voltar ao i-Educar
+    </a>
+"""
+if antigo in texto:
+    texto = texto.replace(antigo, botao, 1)
+elif "    </router-link>\n" in texto:
+    texto = texto.replace("    </router-link>\n", "    </router-link>\n" + botao, 1)
+else:
+    raise SystemExit("Não foi possível incluir o retorno ao i-Educar no cabeçalho.")
+if ".pmd-voltar {" not in texto:
+    texto += """
+<style scoped>
+.pmd-voltar {
+  margin-left: auto;
+  margin-right: 12px;
+  padding: 8px 14px;
+  border-radius: 3px;
+  background: #1f4e66;
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.pmd-voltar:hover,
+.pmd-voltar:focus {
+  background: #16384a;
+  color: #fff;
+  text-decoration: none;
+}
+</style>
+"""
+caminho.write_text(texto)
+PY
+fi
+
+lista="${PKG}/resources/ts/modules/preregistration/components/PreRegistrationList.vue"
+if [[ -f "${lista}" ]] && grep -q 'reactiveRoute' "${lista}"; then
+  python3 - "${lista}" <<'PY'
+from pathlib import Path
+import sys
+caminho = Path(sys.argv[1])
+texto = caminho.read_text()
+texto = texto.replace("const reactiveRoute = computed(() => route);\n", "")
+fechamento = """    load(1);
+  });
+};
+
+getData();"""
+fechamento_novo = """    load(1);
+  })
+  .catch(() => {
+    loadingTable.value = false;
+  });
+};
+
+getData();"""
+if fechamento in texto and ".catch(() => {\n    loadingTable.value = false;" not in texto:
+    texto = texto.replace(fechamento, fechamento_novo, 1)
+antigo = """watch(
+  reactiveRoute,
+  (val) => {
+    // Evita que toda vez que modal seja exibida faça uma requisição de listagem
+    if (val.name === 'preregistration.modal') {
+      return;
+    }
+
+    load((val.query.page as unknown as number) || 1);
+  },
+  {
+    deep: true,
+  }
+);"""
+novo = """watch(
+  () => route.name,
+  (nome, anterior) => {
+    if (anterior === 'preregistration.modal' && nome === 'preregistrations') {
+      load(1);
+    }
+  }
+);"""
+if antigo not in texto:
+    raise SystemExit("Não foi possível interromper o carregamento infinito das inscrições.")
+caminho.write_text(texto.replace(antigo, novo, 1))
+PY
+fi
+
 export VITE_BASE="${VITE_BASE:-/vendor/pre-matricula-digital/}"
 export VITE_ROUTER_BASE="${VITE_ROUTER_BASE:-/pre-matricula-digital}"
 
