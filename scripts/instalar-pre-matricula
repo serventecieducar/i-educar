@@ -87,7 +87,7 @@ PY
 fi
 
 base_ts="${PKG}/resources/ts/router/base.ts"
-if [[ -f "${base_ts}" ]] && grep -q 'VITE_BASE_URL' "${base_ts}"; then
+if [[ -f "${base_ts}" ]]; then
   cat > "${base_ts}" <<'EOF'
 const base = String(import.meta.env.VITE_ROUTER_BASE || '/pre-matricula-digital');
 

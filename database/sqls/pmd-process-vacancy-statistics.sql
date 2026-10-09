@@ -1,4 +1,4 @@
-CREATE VIEW process_vacancy_statistics
+CREATE OR REPLACE VIEW process_vacancy_statistics
 AS
 SELECT
     pv.process_id,

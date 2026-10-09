@@ -1,4 +1,4 @@
-create view process_vacancy as
+create or replace view process_vacancy as
 select
   p.id as process_id,
   c.school_id,

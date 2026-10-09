@@ -25,6 +25,7 @@ class PreMatriculaVisoesCommand extends Command
             'pmd-grades.sql',
             'pmd-periods.sql',
             'pmd-classrooms.sql',
+            'pmd-process-school.sql',
             'pmd-process-vacancy.sql',
             'pmd-process-grade-suggest.sql',
             'pmd-process-vacancy-statistics.sql',
@@ -37,16 +38,12 @@ class PreMatriculaVisoesCommand extends Command
         }
 
         DB::transaction(function () {
-            DB::unprepared('DROP VIEW IF EXISTS public.process_vacancy_statistics');
-            DB::unprepared('DROP VIEW IF EXISTS public.process_vacancy');
-            DB::unprepared('DROP VIEW IF EXISTS public.process_grade_suggest');
-            DB::unprepared('DROP VIEW IF EXISTS public.classrooms');
-
             foreach ([
                 'pmd-school-years.sql',
                 'pmd-grades.sql',
                 'pmd-periods.sql',
                 'pmd-classrooms.sql',
+                'pmd-process-school.sql',
                 'pmd-process-vacancy.sql',
                 'pmd-process-grade-suggest.sql',
                 'pmd-process-vacancy-statistics.sql',
